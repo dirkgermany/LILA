@@ -593,4 +593,4 @@ create or replace PACKAGE BODY SO_LOG AS
         return pProcessId;
     end;
             
-END PCK_LOGGING;
+END SO_LOG;

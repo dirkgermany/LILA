@@ -6,6 +6,7 @@
 - [LOG Tables](#log-tables)
 - [Sequence](#sequence)
 - [LOG Level](#log-level)
+-   [  Declaration of Log Levels](#declaration-of-log-levels)
 - [Functions and Procedures](#functions-and-procedures)
 
 </details>

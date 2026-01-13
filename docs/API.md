@@ -61,11 +61,29 @@ logLevelDebug   constant number := 8;
 ```
     
 ## Functions and Procedures
+| Name               | Type      | Description                         | Scope
+| ------------------ | --------- | ----------------------------------- | -------
+| NEW_SESSION        | Function  | Opens a new log session             | Log Session
+| CLOSE_SESSION      | Procedure | Ends a log session                  | Log Session
+| SET_PROCESS_STATUS | Procedure | Sets the state of the log status    | Log Session
+| INFO               | Procedure | Writes INFO log entry               | Detail Logging
+| DEBUG              | Procedure | Writes DEBUG log entry              | Detail Logging
+| WARN               | Procedure | Writes WARN log entry               | Detail Logging
+| ERROR              | Procedure | Writes ERROR log entry              | Detail Logging
+| LOG_DETAIL         | Procedure | Writes log entry with any log level | Detail Logging
 
+ procedure INFO(p_processId number, p_stepInfo varchar2);
+    procedure DEBUG(p_processId number, p_stepInfo varchar2);
+    procedure WARN(p_processId number, p_stepInfo varchar2);
+    procedure ERROR(p_processId number, p_stepInfo varchar2);
+    
+### Session Handling
     -- (m) = mandatory
     -- (o) = optional
     -- (n) = NULL is allowed
-    
+
+Function NEW_SESSION
+
 
 ```sql    
 function  NEW_SESSION(p_processName varchar2, p_logLevel number, p_daysToKeep number, p_tabNamePrefix varchar2 default 'log_process') return number;

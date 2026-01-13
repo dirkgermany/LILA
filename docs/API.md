@@ -1,5 +1,14 @@
 # simpleOraLogger API
-[_TOC_]
+<details>
+<summary>Inhaltsverzeichnis</summary>
+
+- [Overview](#overview)
+- [LOG Tables](#log-tables)
+- [Sequence](#sequence)
+- [LOG Level](#log-level)
+- [Functions and Procedures](#functions-and-procedures)
+
+</details>
 
 ## Overview
 simpleOraLogger is nothing more than a PL/SQL Package.

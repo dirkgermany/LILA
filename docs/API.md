@@ -63,7 +63,7 @@ logLevelDebug   constant number := 8;
 ## Functions and Procedures
 | Name               | Type      | Description                         | Scope
 | ------------------ | --------- | ----------------------------------- | -------
-| NEW_SESSION [`NEW_SESSION`](#function-new_session) | Function  | Opens a new log session             | Log Session
+| [`NEW_SESSION`](#function-new_session) | Function  | Opens a new log session             | Log Session
 | CLOSE_SESSION      | Procedure | Ends a log session                  | Log Session
 | SET_PROCESS_STATUS | Procedure | Sets the state of the log status    | Log Session
 | INFO               | Procedure | Writes INFO log entry               | Detail Logging
@@ -83,11 +83,21 @@ logLevelDebug   constant number := 8;
     -- (n) = NULL is allowed
 
 #### Function NEW_SESSION
+The NEW_SESSION function starts the logging session for a process.
+| Parameter | Type | Description | Required
+| --------- | ---- | ----------- | -------
+| p_processName | VARCHAR2| freely selectable name for identifying the process; is written to table ‘1’ | Mandatory
+| p_logLevel | NUMBER | determines the level of detail in table ‘2’ (see above) | Mandatory
+| p_daysToKeep | NUMBER | max. age of entries in days; if not NULL, all entries older than p_daysToKeep and whose process name = p_processName (not case sensitive) are deleted | Nullable
+| p_tabNamePrefix | VARCHAR2 | optional prefix of the LOG table names (see above) | Optional
 
+Return
+Type
+Description
 
 ```sql    
 function  NEW_SESSION(p_processName varchar2, p_logLevel number, p_daysToKeep number, p_tabNamePrefix varchar2 default 'log_process') return number;
--- (m) p_processName   : freely selectable name for identifying the process; is written to table ‘1’
+-- (m) p_processName   : 
 -- (m) p_logLevel      : determines the level of detail in table ‘2’ (see above)
 -- (n) p_daysToKeep    : max. age of entries in days; if not NULL, all entries older than p_daysToKeep
 --                       and whose process name = p_processName (not case sensitive) are deleted

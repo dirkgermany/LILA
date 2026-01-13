@@ -8,7 +8,7 @@
 
 ## About
 simpleOraLogger is a logging framework.
-The framework is written as a PL/SQL package and enables other PL/SQL processes writing logs by a simple interface. simpleOraLogger enables simultaneous and multiple logging from the same session or different sessions.
+The framework itself is written as a PL/SQL package and enables other PL/SQL processes writing logs using a simple interface. simpleOraLogger enables simultaneous and multiple logging from the same session or different sessions.
 
 Even though debug informations can be written, simpleOraLogger is primarily intended for monitoring (automated) PL/SQL processes (hereinafter referred to as the processes).
 

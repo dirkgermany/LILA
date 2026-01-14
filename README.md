@@ -58,44 +58,44 @@ begin
   -- begin a new logging session
   -- the last parameter refers to killing log entries which are older than the given number of days
   -- if this param is NULL, no log entry will be deleted
-  gProcessId := so_log.new_session('my application', so_log.logLevelWarn, 30);
+  gProcessId := lila.new_session('my application', lila.logLevelWarn, 30);
 
   -- write a log entry whenever you want
-  so_log.info(gProcessId, 'Start');
+  lila.info(gProcessId, 'Start');
   -- for more details...
-  so_log.debug(gProcessId, 'Function A');
+  lila.debug(gProcessId, 'Function A');
   -- e.g. informations when an exception was raised
-  so_log.error(gProcessId, 'I made a fault');
+  lila.error(gProcessId, 'I made a fault');
 
   -- also you can change the status during your process runs
-  so_log.set_process_status(1, 'DONE');
+  lila.set_process_status(1, 'DONE');
 
   -- last but not least end the logging session
   -- opional you can set the numbers of steps to do and steps done 
-  so_log.close_session(gProcessId, 100, 99, 'DONE', 1);
+  lila.close_session(gProcessId, 100, 99, 'DONE', 1);
 
 end MY_DEMO_PROC;
 ```
 ### Check log entries
 ```sql
-  -- main entries are written to the default log table LOG_PROCESS
-  -- details are writte to the default detail log table LOG_PROCESS_DETAIL
-  -- find out your process by its process name or look for the latest entry in the LOG_PROCESS
+  -- main entries are written to the default log table LILA_PROCESS
+  -- details are writte to the default detail log table LILA_PROCESS_DETAIL
+  -- find out your process by its process name or look for the latest entry in the LILA_PROCESS
 
   -- general status of your process
   -- to shorten the output here in the text I simplified some values
-  select * from LOG_PROCESS where PROCESS_NAME = 'my application';
+  select * from LILA_PROCESS where PROCESS_NAME = 'my application';
 
   -- get details; the NO is the serial order of entries related to the process
-  select * from LOG_PROCESS_DETAIL where process_id = 1 order by NO;
+  select * from LILA_PROCESS_DETAIL where process_id = 1 order by NO;
 ```
 
-#### Result for table LOG_PROCESS
+#### Result for table LILA_PROCESS
 >| ID | PROCESS_NAME   | PROCESS_START         | PROCESS_END           | STEPS_TO_DO | STEPS_DONE | STATUS | INFO
 >| -- | ---------------| --------------------- | --------------------- | ----------- | ---------- | ------ | -----
 >| 1  | my application | 12.01.26 18:18:53,... | 12.01.26 18:18:53,... | 100         | 99         | 2      | ERROR
 
-#### Result for table LOG_PROCESS_DETAIL
+#### Result for table LILA_PROCESS_DETAIL
 >| PROCESS_ID | NO | INFO           | LOG_LEVEL | SESSION_TIME    | SESSION_USER | HOST_NAME | ERR_STACK        | ERR_BACKTRACE    | ERR_CALLSTACK
 >| ---------- | -- | -------------- | --------- | --------------- | ------------ | --------- | ---------------- | ---------------- | ---------------
 >| 1          | 1  | Start          | INFO      | 13.01.26 10:... | SCOTT        | SERVER1   | NULL             | NULL             | NULL

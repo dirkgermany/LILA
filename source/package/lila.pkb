@@ -642,5 +642,15 @@ create or replace PACKAGE BODY LILA AS
         end if;
         return pProcessId;
     end;
-            
+	------------------------------------------------------------------------------------------------
+
+    PROCEDURE IS_ALIVE
+    as
+        pProcessName number(19,0);
+    begin
+        pProcessName := new_session('LILA Life Check', logLevelDebug, null);
+        debug(pProcessName, 'First Message of LILA');
+        close_session(pProcessName, 1, 1, 'OK', 1);
+    end;
+
 END LILA;

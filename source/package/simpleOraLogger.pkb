@@ -1,10 +1,10 @@
-create or replace PACKAGE BODY SO_LOG AS
+create or replace PACKAGE BODY LILA AS
 
     -- Record representing one process
     TYPE t_process_rec IS RECORD (
         process_id      NUMBER(19,0),
         counter_details NUMBER := 0,
-        log_level       NUMBER := 0,
+        LILA_level       NUMBER := 0,
         tabName_prefix  VARCHAR2(100)
     );
 
@@ -17,8 +17,8 @@ create or replace PACKAGE BODY SO_LOG AS
     v_index t_search_idx;
     
     -- Placeholders for Statements
-    PH_LOG_TABLE_NAME constant varchar2(30) := 'PH_LOG_TABLE_NAME';
-    PH_LOG_DETAIL_TABLE_NAME constant varchar2(30) := 'PH_LOG_DETAIL_TABLE_NAME';
+    PH_LILA_TABLE_NAME constant varchar2(30) := 'PH_LILA_TABLE_NAME';
+    PH_LILA_DETAIL_TABLE_NAME constant varchar2(30) := 'PH_LILA_DETAIL_TABLE_NAME';
     PH_PROCESS_NAME constant varchar2(30) := 'PH_PROCESS_NAME';
     PH_PROCESS_INFO constant varchar2(30) := 'PH_PROCESS_INFO';
     PH_COUNTER_DETAILS constant varchar2(30) := 'PH_COUNTER_DETAILS';
@@ -165,8 +165,8 @@ create or replace PACKAGE BODY SO_LOG AS
         -- find record which relates to the process id
         processRecord := getProcessRecord(pProcessId);
         
-        replacedString := replace(replacedString, PH_LOG_TABLE_NAME, processRecord.tabName_prefix);
-        replacedString := replace(replacedString, PH_LOG_DETAIL_TABLE_NAME,  processRecord.tabName_prefix || '_DETAIL');
+        replacedString := replace(replacedString, PH_LILA_TABLE_NAME, processRecord.tabName_prefix);
+        replacedString := replace(replacedString, PH_LILA_DETAIL_TABLE_NAME,  processRecord.tabName_prefix || '_DETAIL');
         replacedString := replace(replacedString, PH_PROCESS_NAME, pProcessName);
         replacedString := replace(replacedString, PH_PROCESS_INFO, pProcessInfo);
         replacedString := replace(replacedString, PH_COUNTER_DETAILS, processRecord.counter_details);
@@ -201,7 +201,7 @@ create or replace PACKAGE BODY SO_LOG AS
         
         -- find out process IDs
         sqlStatement := '
-        select id from PH_LOG_TABLE_NAME
+        select id from PH_LILA_TABLE_NAME
         where process_end <= sysdate - PH_DAYS_TO_KEEP
         and upper(process_name) = upper(''PH_PROCESS_NAME'')';
         
@@ -216,7 +216,7 @@ create or replace PACKAGE BODY SO_LOG AS
 
             -- kill entries in main log table
             sqlStatement := '
-            delete from PH_LOG_TABLE_NAME
+            delete from PH_LILA_TABLE_NAME
             where id = PH_ID';
             
             sqlStatement := replacePlaceHolders(p_processId, sqlStatement, null, null, null, null, null, null, null);
@@ -225,7 +225,7 @@ create or replace PACKAGE BODY SO_LOG AS
             
             -- kill entries from log details table
             sqlStatement := '
-            delete from PH_LOG_DETAIL_TABLE_NAME
+            delete from PH_LILA_DETAIL_TABLE_NAME
             where process_id = PH_ID';
             sqlStatement := replacePlaceHolders(p_processId, sqlStatement, null, null, null, null, null, null, null);
             sqlStatement := replace(sqlStatement, 'PH_ID', to_char(pProcessIdToDelete));
@@ -377,7 +377,7 @@ create or replace PACKAGE BODY SO_LOG AS
         updateProcessRecord(processRecord);
         
         sqlStatement := '
-        insert into PH_LOG_DETAIL_TABLE_NAME (
+        insert into PH_LILA_DETAIL_TABLE_NAME (
             process_id, no, info, log_level,
             session_user, host_name, err_callstack
         )
@@ -405,7 +405,7 @@ create or replace PACKAGE BODY SO_LOG AS
         updateProcessRecord(processRecord);
         
         sqlStatement := '
-        insert into PH_LOG_DETAIL_TABLE_NAME (
+        insert into PH_LILA_DETAIL_TABLE_NAME (
             process_id, no, info, log_level,
             session_user, host_name, err_stack, err_backtrace, err_callstack
         )
@@ -489,7 +489,7 @@ create or replace PACKAGE BODY SO_LOG AS
         sqlStatement varchar2(500);
     begin
         sqlStatement := '
-        update PH_LOG_TABLE_NAME
+        update PH_LILA_TABLE_NAME
         set status = PH_STATUS 
         where id = PH_PROCESS_ID';   
         sqlStatement := replacePlaceHolders(p_processId, sqlStatement, null, p_status, null, null, null, null, null);
@@ -506,7 +506,7 @@ create or replace PACKAGE BODY SO_LOG AS
         sqlStatement varchar2(500);
     begin
         sqlStatement := '
-        update PH_LOG_TABLE_NAME
+        update PH_LILA_TABLE_NAME
         set status = PH_STATUS,
             info = ''PH_PROCESS_INFO''
         where id = PH_PROCESS_ID';
@@ -530,7 +530,7 @@ create or replace PACKAGE BODY SO_LOG AS
 
 		if getProcessRecord(p_processId).log_level > logLevelSilent then
 	        sqlStatement := '
-	        update PH_LOG_TABLE_NAME
+	        update PH_LILA_TABLE_NAME
 	        set process_end = current_timestamp,
 	            steps_todo = PH_STEPS_TO_DO,
 	            steps_done = PH_STEPS_DONE,
@@ -568,7 +568,7 @@ create or replace PACKAGE BODY SO_LOG AS
 	        deleteOldLogs(pProcessId, upper(trim(p_processName)), p_daysToKeep);
 	        
 	        sqlStatement := '
-	        insert into PH_LOG_TABLE_NAME (
+	        insert into PH_LILA_TABLE_NAME (
 	            id,
 	            process_name,
 	            process_start,
@@ -596,4 +596,4 @@ create or replace PACKAGE BODY SO_LOG AS
         return pProcessId;
     end;
             
-END SO_LOG;
+END LILA;

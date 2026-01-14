@@ -36,11 +36,7 @@ create or replace PACKAGE BODY SO_LOG AS
 
     
     cr constant varchar2(2) := chr(13) || chr(10);
-    
     function getProcessRecord(p_processId number) return t_process_rec;
---    function getLogLevelAsText(p_logLevelNumber number) return varchar2;
---    function replacePlaceHolders(pProcessId number, pStringToReplace varchar2, pProcessName varchar2, pStatus number, pProcessInfo varchar2, 
---        pStepInfo varchar2, pStepsToDo number, pStepsDone number, pLogLevel number) return varchar2;
 
     /*
         Internal methods.

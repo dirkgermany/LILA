@@ -102,8 +102,8 @@ create or replace PACKAGE BODY LILA AS
     as
         sqlStmt varchar2(500);
     begin
-        if not sequenceExists('SEQ_LOG') then
-            sqlStmt := 'CREATE SEQUENCE SEQ_LOG MINVALUE 0 MAXVALUE 9999999999999999999999999999 INCREMENT BY 1 START WITH 1 CACHE 10 NOORDER  NOCYCLE  NOKEEP  NOSCALE  GLOBAL';
+        if not sequenceExists('SEQ_LILA_LOG') then
+            sqlStmt := 'CREATE SEQUENCE SEQ_LILA_LOG MINVALUE 0 MAXVALUE 9999999999999999999999999999 INCREMENT BY 1 START WITH 1 CACHE 10 NOORDER  NOCYCLE  NOKEEP  NOSCALE  GLOBAL';
             execute immediate sqlStmt;
         end if;
         
@@ -608,7 +608,7 @@ create or replace PACKAGE BODY LILA AS
 	        createLogTables(p_tabNamePrefix);
         end if;
         
-        select seq_log.nextVal into pProcessId from dual;
+        select seq_lila_log.nextVal into pProcessId from dual;
         insertProcess (p_tabNamePrefix, pProcessId, p_logLevel);
 
 		if p_logLevel > logLevelSilent then

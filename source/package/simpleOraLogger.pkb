@@ -527,19 +527,20 @@ create or replace PACKAGE BODY SO_LOG AS
         if getProcessRecord(p_processId).process_id is null then
             return;
         end if;
-        
-        sqlStatement := '
-        update PH_LOG_TABLE_NAME
-        set process_end = current_timestamp,
-            steps_todo = PH_STEPS_TO_DO,
-            steps_done = PH_STEPS_DONE,
-            info = ''PH_PROCESS_INFO'', 
-            status = PH_STATUS
-        where id = PH_PROCESS_ID';   
-        sqlStatement := replacePlaceHolders(p_processId, sqlStatement, null, p_status, p_processInfo, null, p_stepsToDo, p_stepsDone, null);
-        execute immediate sqlStatement;
-        commit;
-        
+
+		if getProcessRecord(p_processId).log_level > logLevelSilent then
+	        sqlStatement := '
+	        update PH_LOG_TABLE_NAME
+	        set process_end = current_timestamp,
+	            steps_todo = PH_STEPS_TO_DO,
+	            steps_done = PH_STEPS_DONE,
+	            info = ''PH_PROCESS_INFO'', 
+	            status = PH_STATUS
+	        where id = PH_PROCESS_ID';   
+	        sqlStatement := replacePlaceHolders(p_processId, sqlStatement, null, p_status, p_processInfo, null, p_stepsToDo, p_stepsDone, null);
+	        execute immediate sqlStatement;
+	        commit;
+        end if;
         processList.delete(p_processId);
     end;
 
@@ -554,38 +555,46 @@ create or replace PACKAGE BODY SO_LOG AS
         sqlStatement varchar2(600);
         pProcessId number(19,0);
     begin
-        -- Sicherstellen, dass die LOG-Tabellen existieren
-        createLogTables(p_tabNamePrefix);
+        -- If silent log mode don't do anything
+        if p_logLevel > logLevelSilent then
+	        -- Sicherstellen, dass die LOG-Tabellen existieren
+	        createLogTables(p_tabNamePrefix);
+            select seq_log.nextVal into pProcessId from dual;
+        else
+            pProcessId = 0;
+        end if;
         
-        select seq_log.nextVal into pProcessId from dual;
-        insertProcess (p_tabNamePrefix, pProcessId, p_logLevel);        
-        deleteOldLogs(pProcessId, upper(trim(p_processName)), p_daysToKeep);
-        
-        sqlStatement := '
-        insert into PH_LOG_TABLE_NAME (
-            id,
-            process_name,
-            process_start,
-            process_end,
-            steps_todo,
-            steps_done,
-            status,
-            info
-        )
-        select
-            PH_PROCESS_ID, 
-            ''PH_PROCESS_NAME'', 
-            current_timestamp,
-            null, 
-            null,
-            null, 
-            0,
-            ''START''
-        from dual';
-        sqlStatement := replacePlaceHolders(pProcessId, sqlStatement, p_processName, null, null, null, null, null, null);
-        execute immediate sqlStatement;     
-        
-        commit;
+        insertProcess (p_tabNamePrefix, pProcessId, p_logLevel);
+
+		if p_logLevel > logLevelSilent then
+	        deleteOldLogs(pProcessId, upper(trim(p_processName)), p_daysToKeep);
+	        
+	        sqlStatement := '
+	        insert into PH_LOG_TABLE_NAME (
+	            id,
+	            process_name,
+	            process_start,
+	            process_end,
+	            steps_todo,
+	            steps_done,
+	            status,
+	            info
+	        )
+	        select
+	            PH_PROCESS_ID, 
+	            ''PH_PROCESS_NAME'', 
+	            current_timestamp,
+	            null, 
+	            null,
+	            null, 
+	            0,
+	            ''START''
+	        from dual';
+	        sqlStatement := replacePlaceHolders(pProcessId, sqlStatement, p_processName, null, null, null, null, null, null);
+	        execute immediate sqlStatement;     
+	        
+	        commit;
+        end if;
         return pProcessId;
     end;
             

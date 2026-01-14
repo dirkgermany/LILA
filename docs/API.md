@@ -72,7 +72,7 @@ Although the lack of a regular log session termination (e.g., due to an uncaught
 Ultimately, all that is required for a complete life cycle is to call the NEW_SESSION function at the beginning of the session and the CLOSE_SESSION procedure at the end of the session.
 
 ## Log Tables
-Logging takes place in two tables. Here I distinguish them by *master table* and *detail table*.
+The logging takes place in two tables. Below, I distinguish between them by referring to them as the *master table* and the *detail table*.
 
 Table *master table* is the leading table and contains the started processes, their names, and status. There is exactly one entry in this table for each process and log session.
 

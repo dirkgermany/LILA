@@ -30,25 +30,25 @@ For reasons of clarity, however, the use of dedicated LOG tables is recommended.
 The LOG entries are persisted within encapsulated transactions. This means that logging is independent of the (missing) COMMIT of the calling processes.
 
 ## LOG Tables
-Logging takes place in two tables. Here I distinguish them by '1' and '2'.
+Logging takes place in two tables. Here I distinguish them by *master table* and *detail table*.
 
-Table '1' is the leading table and contains the started processes, their names, and status. There is exactly one entry in this table for each process and log session.
+Table *master table* is the leading table and contains the started processes, their names, and status. There is exactly one entry in this table for each process and log session.
 
-The entries in Table '2' contain further details corresponding to the entries in Table 1.
+The entries in *detail table* contain further details corresponding to the entries in Table 1.
 
 Both tables have standard names.
-At the same time, the name of table '1' is the so-called prefix for table '2'.
+At the same time, the name of table *master table* is the so-called prefix for the *detail table*.
         
-* The default name for table '1' is LILA_PROCESS.
-* The default name for table '2' is LILA_PROCESS_DETAIL
+* The default name for the *master table* is LILA_PROCESS.
+* The default name for the *detail table* is LILA_PROCESS_DETAIL
        
-The name of table '1' can be customized; for table '2', the 
-selected name of table '1' is added as a prefix and _DETAIL is appended.
+The name of table *master table* can be customized; for *detail table*, the 
+selected name of table *master table* is added as a prefix and _DETAIL is appended.
     
 Example:
-Selected name '1' = MY_LOG_TABLE
+Selected name *master table* = MY_LOG_TABLE
 
-Set name '2' is automatically = MY_LOG_TABLE_DETAIL
+Set name *detail table* is automatically = MY_LOG_TABLE_DETAIL
 
 ## Sequence
 Logging uses a sequence to assign process IDs. The name of the sequence is SEQ_LILA_LOG.
@@ -57,7 +57,7 @@ Logging uses a sequence to assign process IDs. The name of the sequence is SEQ_L
 Depending on the selected log level, additional information is written to table ‘2’ (_DETAIL).
         
 To do this, the selected log level must be >= the level implied in the logging call.
-* logLevelSilent -> No details are written to table '2'
+* logLevelSilent -> No details are written to the *detail table*
 * logLevelError  -> Calls to the ERROR() procedure are taken into account
 * logLevelWarn   -> Calls to the WARN() and ERROR() procedures are taken into account
 * logLevelInfo   -> Calls to the INFO(), WARN(), and ERROR() procedures are taken into account
@@ -202,7 +202,7 @@ lila.set_process_status(gProcessId, 1, 'OK');
 
 ### Write Logs related Procedures
 #### General Logging Procedures
-The detailed log entries in log table '2' are written using various procedures.
+The detailed log entries in *detail table* are written using various procedures.
 Depending on the log level corresponding to the desired entry, the appropriate procedure is called.
 
 The procedures have the same signatures and differ only in their names.
@@ -273,7 +273,7 @@ lila.log_detail(gProcessId, 'I ignore the log level');
 Independent to other Packages you can check if LILA works in general.
 
 #### PROCEDURE IS_ALIVE
-Creates one entry in the master table and one in the detail table.
+Creates one entry in the *master table* and one in the detail table.
 
 This procedure needs no parameters.
 ```sql

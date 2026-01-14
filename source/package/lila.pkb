@@ -164,7 +164,44 @@ create or replace PACKAGE BODY LILA AS
     begin
         -- find record which relates to the process id
         processRecord := getProcessRecord(pProcessId);
-        
+
+		-- not nice but saves memory actions
+        replacedString := replace(
+            replace(
+                replace(
+                    replace(
+                        replace(
+                            replace(
+                                replace(
+                                    replace(
+                                        replace(
+                                            replace(
+                                                replace(
+                                                    replace(
+                                                        replace(
+                                                            replace(
+                                                                replace(
+                                                                    replace(
+                                                                        replacedString, PH_LILA_TABLE_NAME, processRecord.tabName_prefix
+                                                                    ), PH_LILA_DETAIL_TABLE_NAME,  processRecord.tabName_prefix || '_DETAIL'
+                                                                ), PH_PROCESS_NAME, pProcessName
+                                                            ), PH_PROCESS_INFO, pProcessInfo
+                                                        ), PH_COUNTER_DETAILS, processRecord.counter_details
+                                                    ), PH_STEP_INFO, pStepInfo
+                                                ), PH_PROCESS_ID, pProcessId
+                                            ), PH_STATUS, pStatus
+                                        ), PH_STEPS_TO_DO, pStepsToDo
+                                    ), PH_STEPS_DONE, pStepsDone
+                                ), PH_LOG_LEVEL, getLogLevelAsText(pLogLevel)
+                            ), PH_SESSION_USER, SYS_CONTEXT('USERENV','SESSION_USER')
+                        ), PH_HOST_NAME, SYS_CONTEXT('USERENV','HOST')
+                    ), PH_ERR_CALLSTACK, DBMS_UTILITY.FORMAT_CALL_STACK
+                ), PH_ERR_STACK, DBMS_UTILITY.FORMAT_ERROR_STACK
+            ), PH_ERR_BACKTRACE, DBMS_UTILITY.FORMAT_ERROR_BACKTRACE
+        );
+
+/*
+	old variant performs many memory allocations
         replacedString := replace(replacedString, PH_LILA_TABLE_NAME, processRecord.tabName_prefix);
         replacedString := replace(replacedString, PH_LILA_DETAIL_TABLE_NAME,  processRecord.tabName_prefix || '_DETAIL');
         replacedString := replace(replacedString, PH_PROCESS_NAME, pProcessName);
@@ -181,7 +218,7 @@ create or replace PACKAGE BODY LILA AS
         replacedString := replace(replacedString, PH_ERR_CALLSTACK, DBMS_UTILITY.FORMAT_CALL_STACK);
         replacedString := replace(replacedString, PH_ERR_STACK, DBMS_UTILITY.FORMAT_ERROR_STACK);
         replacedString := replace(replacedString, PH_ERR_BACKTRACE, DBMS_UTILITY.FORMAT_ERROR_BACKTRACE);
-
+*/
         return replacedString;
     end;
 

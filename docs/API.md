@@ -1,4 +1,4 @@
-# simpleOraLogger API
+# LILA API
 <details>
 <summary>Content</summary>
 
@@ -19,8 +19,7 @@
 </details>
 
 ## Overview
-simpleOraLogger is nothing more than a PL/SQL Package.
-To shorten the procedures and functions the package is named SO_LOG (package and body).
+LILA is nothing more than a PL/SQL Package.
 
 This package enables logging from other packages.
 Different packages can use logging simultaneously from a single session and write to either dedicated or the same LOG table.
@@ -40,8 +39,8 @@ The entries in Table '2' contain further details corresponding to the entries in
 Both tables have standard names.
 At the same time, the name of table '1' is the so-called prefix for table '2'.
         
-* The default name for table '1' is LOG_PROCESS.
-* The default name for table '2' is LOG_PROCESS_DETAIL
+* The default name for table '1' is LILA_PROCESS.
+* The default name for table '2' is LILA_PROCESS_DETAIL
        
 The name of table '1' can be customized; for table '2', the 
 selected name of table '1' is added as a prefix and _DETAIL is appended.
@@ -114,12 +113,12 @@ FUNCTION NEW_SESSION(p_processName VARCHAR2, p_logLevel NUMBER, p_daysToKeep NUM
 
 -- Usage
 --------
--- No deletion of old entries, log table name is 'LOG_PROCESS'
-gProcessId := so_log.new_session('my application', so_log.logLevelWarn, null);
+-- No deletion of old entries, log table name is 'LILA_PROCESS'
+gProcessId := lila.new_session('my application', lila.logLevelWarn, null);
 -- keep entries which are not older than 30 days
-gProcessId := so_log.new_session('my application', so_log.logLevelWarn, 30);
+gProcessId := lila.new_session('my application', lila.logLevelWarn, 30);
 -- use another log table name
-gProcessId := so_log.new_session('my application', so_log.logLevelWarn, null, 'MY_LOG_TABLE');
+gProcessId := lila.new_session('my application', lila.logLevelWarn, null, 'MY_LOG_TABLE');
 ```
 
 #### Procedure CLOSE_SESSION
@@ -144,9 +143,9 @@ PROCEDURE CLOSE_SESSION(p_processId NUMBER, p_stepsToDo NUMBER, p_stepsDone NUMB
 -- assuming that gProcessId is the global stored process ID
 
 -- close without informations about process steps
-so_log.close_session(gProcessId, null, null, 'Success', 1);
+lila.close_session(gProcessId, null, null, 'Success', 1);
 -- close with additional informations about steps
-so_log.close_session(gProcessId, 100, 99, 'Problem', 2);
+lila.close_session(gProcessId, 100, 99, 'Problem', 2);
 ```
 
 #### Procedure SET_PROCESS_STATUS
@@ -182,9 +181,9 @@ PROCEDURE SET_PROCESS_STATUS(p_processId NUMBER, p_status NUMBER, p_processInfo 
 -- assuming that gProcessId is the global stored process ID
 
 -- updating only by a status represented by a number
-so_log.set_process_status(gProcessId, 1);
+lila.set_process_status(gProcessId, 1);
 -- updating by using an additional information
-so_log.set_process_status(gProcessId, 1, 'OK');
+lila.set_process_status(gProcessId, 1, 'OK');
 ```
 
 ### Write Logs related Procedures
@@ -229,9 +228,9 @@ PROCEDURE DEBUG(p_processId NUMBER, p_stepInfo VARCHAR2)
 -- assuming that gProcessId is the global stored process ID
 
 -- write an error
-so_log.error(gProcessId, 'Something happened');
+lila.error(gProcessId, 'Something happened');
 -- write a debug information
-so_log.debug(gProcessId, 'Function was called');
+lila.debug(gProcessId, 'Function was called');
 ```
 
 #### Procedure LOG_DETAIL
@@ -254,5 +253,5 @@ PROCEDURE LOG_DETAIL(p_processId NUMBER, p_stepInfo VARCHAR2, p_logLevel NUMBER)
 -- assuming that gProcessId is the global stored process ID
 
 -- write a log record
-so_log.log_detail(gProcessId, 'I ignore the log level');
+lila.log_detail(gProcessId, 'I ignore the log level');
 ```

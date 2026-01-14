@@ -2,8 +2,12 @@
 <details>
 <summary>Content</summary>
 
+- [At First](#at-first)
 - [Overview](#overview)
-- [LOG Tables](#log-tables)
+- [Log Session](#log-session)
+  - [What it is](#what-it-is)
+  - [Log Session Life Cycle](#log-session-life-cycle)
+- [Log Tables](#log-tables)
 - [Sequence](#sequence)
 - [LOG Level](#log-level)
   - [Declaration of Log Levels](#declaration-of-log-levels)
@@ -18,6 +22,16 @@
 
 </details>
 
+## At first
+This documentation strives to be comprehensive and accurate.
+
+The detailed nature of this document may give the impression that using LILA is complex and time-consuming and requires a correspondingly high level of training.
+
+In fact, a few interface calls are all that is needed for comprehensive monitoring or logging. Existing program code for the processes to be monitored also requires only minor adjustments.
+Nevertheless, for a basic understanding of LILA and smooth integration into your applications, I recommend reading my hopefully not too boring explanations below.
+However, if you want to get started right away and don't want to waste time reading documentation, I recommend the sample application. If you look at the code of this application, you will probably already understand and be able to use the most important concepts of LILA.
+And who knows, when you have a quiet moment, you might decide to take another look at this document after all.
+
 ## Overview
 LILA is nothing more than a PL/SQL Package.
 
@@ -25,11 +39,39 @@ This package enables logging from other packages.
 Different packages can use logging simultaneously from a single session and write to either dedicated or the same LOG table.
         
 Even when using a shared LOG table, the LOG entries can be identified by process name and — in the case of multiple calls to the same process — by process IDs (filtered via SQL).
-For reasons of clarity, however, the use of dedicated LOG tables is recommended.
+For reasons of clarity, however, the use of dedicated LOG tables could make sense.
+
+There is exactly one log entry for each logging process in the so called *master table*.
+Additional informations (error, warn, info, debug) about the process are written to the so called *detail table* (see [`Log Tables`](#log-tables)).
         
 The LOG entries are persisted within encapsulated transactions. This means that logging is independent of the (missing) COMMIT of the calling processes.
 
-## LOG Tables
+## Log Session
+The log session is a central concept within LILA and sets it apart from many other PL/SQL logging frameworks.
+
+### What it is
+*Why use a so called Log Session? What is it?*
+
+First of all: don't panic! The term “log session” simply describes various dependencies and states of logging related to the calling process. Ultimately, a log session encapsulates the logging configuration tailored to the respective process (log level, log tables, counters for details, etc.).
+A log session is **not** an additional database session, instance of a database process, or anything similar.
+
+A Log Session accompanies the execution of a PL/SQL process. Just as each running instance of a process is unique, so too is each Log Session.
+
+*Why can't LILA simply write directly to the log tables without a Log Session, like other logging frameworks? Wouldn't it be sufficient to differentiate using the process name, for example?*
+
+LILA not only enables parallel logging from multiple processes, but also — as mentioned above — different configuration values for each process. The configuration values are part of a log session.
+
+### Log Session Life Cycle
+Ideally, the Log Session begins when the process starts and ends when the process ends.
+**With the beginning** of a Log Session the one and only log entry is written to the *master table*.
+**During** the Log Session this one log entry can be updated and additional informations can be written to the *detail table*.
+**At the end** of a Log Session the log entry again can be updated.
+
+Although the lack of a regular log session termination (e.g., due to an uncaught exception in the calling process) is technically unsound, it does not ultimately lead to any real problems.
+
+Ultimately, all that is required for a complete life cycle is to call the NEW_SESSION function at the beginning of the session and the CLOSE_SESSION procedure at the end of the session.
+
+## Log Tables
 Logging takes place in two tables. Here I distinguish them by *master table* and *detail table*.
 
 Table *master table* is the leading table and contains the started processes, their names, and status. There is exactly one entry in this table for each process and log session.

@@ -127,6 +127,9 @@ Shortcuts for parameter requirement:
 | [`NEW_SESSION`](#function-new_session) | Function  | Opens a new log session | Log Session
 | [`CLOSE_SESSION`](#procedure-close_session) | Procedure | Ends a log session | Log Session, Session Handling
 | [`SET_PROCESS_STATUS`](#procedure-set_process_status) | Procedure | Sets the state of the log status    | Log Session, Session Handling
+| [`SET_STEPS_TODO`](#procedure-set_steps_todo) | Procedure | Sets the required number of actions | Log Session, Session Handling
+| [`SET_STEPS_DONE`](#procedure-set_steps_todo) | Procedure | Sets the number of completed actions | Log Session, Session Handling
+| [`STEP_COMPLETED`](#procedure-step_completed) | Procedure | Increments the counter of completed steps | Log Session, Session Handling
 | [`INFO`](#general-logging-procedures) | Procedure | Writes INFO log entry               | Detail Logging
 | [`DEBUG`](#general-logging-procedures) | Procedure | Writes DEBUG log entry              | Detail Logging
 | [`WARN`](#general-logging-procedures) | Procedure | Writes WARN log entry               | Detail Logging
@@ -136,11 +139,22 @@ Shortcuts for parameter requirement:
 
 ### Session related Functions and Procedures
 #### Function NEW_SESSION
-The NEW_SESSION function starts the logging session for a process.
+The NEW_SESSION function starts the logging session for a process. Two function signatures are available for different scenarios.
+
+*Option 1*
 | Parameter | Type | Description | Required
 | --------- | ---- | ----------- | -------
 | p_processName | VARCHAR2| freely selectable name for identifying the process; is written to *master table* | [`M`](#m)
 | p_logLevel | NUMBER | determines the level of detail in *detail table* (see above) | [`M`](#m)
+| p_daysToKeep | NUMBER | max. age of entries in days; if not NULL, all entries older than p_daysToKeep and whose process name = p_processName (not case sensitive) are deleted | [`N`](#n)
+| p_tabNamePrefix | VARCHAR2 | optional prefix of the LOG table names (see above) | [`O`](#o)
+
+*Option 2*
+| Parameter | Type | Description | Required
+| --------- | ---- | ----------- | -------
+| p_processName | VARCHAR2| freely selectable name for identifying the process; is written to *master table* | [`M`](#m)
+| p_logLevel | NUMBER | determines the level of detail in *detail table* (see above) | [`M`](#m)
+| p_stepsToDo | NUMBER | defines how many steps must be done during the process | [`M`](#m)
 | p_daysToKeep | NUMBER | max. age of entries in days; if not NULL, all entries older than p_daysToKeep and whose process name = p_processName (not case sensitive) are deleted | [`N`](#n)
 | p_tabNamePrefix | VARCHAR2 | optional prefix of the LOG table names (see above) | [`O`](#o)
 
@@ -156,12 +170,18 @@ FUNCTION NEW_SESSION(p_processName VARCHAR2, p_logLevel NUMBER, p_daysToKeep NUM
 
 -- Usage
 --------
+-- Option 1
 -- No deletion of old entries, log table name is 'LILA_PROCESS'
 gProcessId := lila.new_session('my application', lila.logLevelWarn, null);
 -- keep entries which are not older than 30 days
 gProcessId := lila.new_session('my application', lila.logLevelWarn, 30);
 -- use another log table name
 gProcessId := lila.new_session('my application', lila.logLevelWarn, null, 'MY_LOG_TABLE');
+
+-- Option 2
+-- likely Option 1 but with information about the steps to be done (100)
+gProcessId := lila.new_session('my application', lila.logLevelWarn, 100, null);
+gProcessId := lila.new_session('my application', lila.logLevelWarn, 100, null, 'MY_LOG_TABLE');
 ```
 
 #### Procedure CLOSE_SESSION
@@ -240,6 +260,70 @@ PROCEDURE SET_PROCESS_STATUS(p_processId NUMBER, p_status NUMBER, p_processInfo 
 lila.set_process_status(gProcessId, 1);
 -- updating by using an additional information
 lila.set_process_status(gProcessId, 1, 'OK');
+```
+#### Procedure SET_STEPS_TODO
+Updates the number of required steps during the process in the log entry of the *master table*.
+
+| Parameter | Type | Description | Required
+| --------- | ---- | ----------- | -------
+| p_processId | NUMBER | ID of the process to which the session applies | [`M`](#m)
+| p_stepsToDo | NUMBER | defines how many steps must be done during the process | [`M`](#m)
+
+**Syntax and Examples**
+```sql
+-- Syntax
+---------
+PROCEDURE SET_STEPS_TODO(p_processId NUMBER, p_stepsToDo NUMBER)
+
+-- Usage
+--------
+-- assuming that gProcessId is the global stored process ID
+
+-- updating only by a status represented by a number
+lila.set_steps_todo(gProcessId, 100);
+```
+
+#### Procedure SET_STEPS_DONE
+Updates the number of completed steps during the process in the log entry of the *master table*.
+
+| Parameter | Type | Description | Required
+| --------- | ---- | ----------- | -------
+| p_processId | NUMBER | ID of the process to which the session applies | [`M`](#m)
+| p_stepsDone | NUMBER | shows how many steps of the process are already completed | [`M`](#m)
+
+**Syntax and Examples**
+```sql
+-- Syntax
+---------
+PROCEDURE SET_STEPS_DONE(p_processId NUMBER, p_stepsDone NUMBER)
+
+-- Usage
+--------
+-- assuming that gProcessId is the global stored process ID
+
+-- updating only by a status represented by a number
+lila.set_steps_done(gProcessId, 99);
+```
+
+#### Procedure STEP_COMPLETED
+Increments the number of already completed steps in the log entry of the *master table*.
+
+| Parameter | Type | Description | Required
+| --------- | ---- | ----------- | -------
+| p_processId | NUMBER | ID of the process to which the session applies | [`M`](#m)
+
+**Syntax and Examples**
+```sql
+-- Syntax
+---------
+PROCEDURE STEP_COMPLETED(p_processId NUMBER)
+
+-- Usage
+--------
+-- assuming that gProcessId is the global stored process ID
+
+-- something like a trigger
+lila.step_completed(gProcessId);
 ```
 
 ### Write Logs related Procedures

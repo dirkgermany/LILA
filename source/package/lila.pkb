@@ -630,12 +630,22 @@ create or replace PACKAGE BODY LILA AS
 		if getProcessRecord(p_processId).log_level > logLevelSilent then
 	        sqlStatement := '
 	        update PH_LILA_TABLE_NAME
-	        set process_end = current_timestamp,
-	            steps_todo = PH_STEPS_TO_DO,
-	            steps_done = PH_STEPS_DONE,
-	            info = ''PH_PROCESS_INFO'', 
-	            status = PH_STATUS
-	        where id = PH_PROCESS_ID';   
+	        set process_end = current_timestamp';
+            
+            if p_stepsDone is not null then
+                sqlStatement := sqlStatement || ', steps_done = PH_STEPS_DONE';
+            end if;
+            if p_stepsToDo is not null then
+                sqlStatement := sqlStatement || ', steps_todo = PH_STEPS_TO_DO';
+            end if;
+            if p_processInfo is not null then
+                sqlStatement := sqlStatement || ', info = ''PH_PROCESS_INFO''';
+            end if;     
+            if p_status is not null then
+                sqlStatement := sqlStatement || ', status = PH_STATUS';
+            end if;     
+            
+            sqlStatement := sqlStatement || ' where id = PH_PROCESS_ID'; 
 	        sqlStatement := replacePlaceHolders(p_processId, sqlStatement, null, p_status, p_processInfo, null, p_stepsToDo, p_stepsDone, null);
 	        execute immediate sqlStatement;
 	        commit;
@@ -648,7 +658,7 @@ create or replace PACKAGE BODY LILA AS
     -- Opens/starts a new logging session.
     -- The returned process id must be stored within the calling procedure because it is the reference
     -- which is recommended for all following actions (e.g. CLOSE_SESSION, DEBUG, SET_PROCESS_STATUS).
-	function NEW_SESSION(p_processName VARCHAR2, p_logLevel NUMBER, p_stepsToDo NUMBER, p_daysToKeep NUMBER, p_tabNamePrefix VARCHAR2 DEFAULT 'LOG_PROCESS') return number
+	function NEW_SESSION(p_processName VARCHAR2, p_logLevel NUMBER, p_stepsToDo NUMBER, p_daysToKeep NUMBER, p_tabNamePrefix VARCHAR2 DEFAULT 'LILA_PROCESS') return number
     as
         lProcessId number;
     begin
@@ -662,7 +672,7 @@ create or replace PACKAGE BODY LILA AS
     -- Opens/starts a new logging session.
     -- The returned process id must be stored within the calling procedure because it is the reference
     -- which is recommended for all following actions (e.g. CLOSE_SESSION, DEBUG, SET_PROCESS_STATUS).
-    function NEW_SESSION(p_processName varchar2, p_logLevel number, p_daysToKeep number, p_tabNamePrefix varchar2 default 'lila_process') return number
+    function NEW_SESSION(p_processName varchar2, p_logLevel number, p_daysToKeep number, p_tabNamePrefix varchar2 default 'LILA_PROCESS') return number
     as
         pragma autonomous_transaction;
         sqlStatement varchar2(600);

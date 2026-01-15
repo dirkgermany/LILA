@@ -1,7 +1,7 @@
 create or replace PACKAGE BODY LILA AS
 
     -- Record representing one process
-    TYPE t_process_rec IS RECORD (
+    TYPE t_session_rec IS RECORD (
         process_id      NUMBER(19,0),
         counter_details NUMBER := 0,
         log_level       NUMBER := 0,
@@ -9,8 +9,8 @@ create or replace PACKAGE BODY LILA AS
     );
 
     -- Table for several processes
-    TYPE t_process_tab IS TABLE OF t_process_rec;
-    processList t_process_tab := null;
+    TYPE t_session_tab IS TABLE OF t_session_rec;
+    g_sessionList t_session_tab := null;
 
     -- Index for entries in process list
     TYPE t_search_idx IS TABLE OF PLS_INTEGER INDEX BY BINARY_INTEGER;
@@ -36,7 +36,7 @@ create or replace PACKAGE BODY LILA AS
 
 
     cr constant varchar2(2) := chr(13) || chr(10);
-    function getProcessRecord(p_processId number) return t_process_rec;
+    function getSessionRecord(p_processId number) return t_session_rec;
 
     /*
         Internal methods.
@@ -160,10 +160,10 @@ create or replace PACKAGE BODY LILA AS
         pStepInfo varchar2, pStepsToDo number, pStepsDone number, pLogLevel number) return varchar2
     as
         replacedString varchar2(4000) := pStringToReplace;
-        processRecord t_process_rec;
+        processRecord t_session_rec;
     begin
         -- find record which relates to the process id
-        processRecord := getProcessRecord(pProcessId);
+        processRecord := getSessionRecord(pProcessId);
         
         /*
             später tauschen, wenn der Rest funktioniert
@@ -277,15 +277,15 @@ create or replace PACKAGE BODY LILA AS
 
 
     /*
-		Methods dedicated to the processList
+		Methods dedicated to the g_sessionList
 	*/
 
     -- Delivers a record of the internal list which belongs to the process id
     -- Return value is NULL BUT! datatype RECORD cannot be validated by IS NULL.
     -- RECORDs are always initialized.
     -- So you have to check by something like
-    -- IF getProcessRecord(my_id).process_id IS NULL ...
-    function getProcessRecord(p_processId number) return t_process_rec
+    -- IF getSessionRecord(my_id).process_id IS NULL ...
+    function getSessionRecord(p_processId number) return t_session_rec
     as
         listIndex number;
     begin
@@ -294,24 +294,24 @@ create or replace PACKAGE BODY LILA AS
         end if;
 
         listIndex := v_index(p_processId);
-        return processList(listIndex);
+        return g_sessionList(listIndex);
     end;
 
 	------------------------------------------------------------------------------------------------
 
     -- Set values of a stored record in the internal process list by a given record
-    procedure updateProcessRecord(p_processRecord t_process_rec)
+    procedure updateSessionRecord(p_sessionRecord t_session_rec)
     as
         listIndex number;
     begin
-        listIndex := v_index(p_processRecord.process_id);
-        processList(listIndex) := p_processRecord;
+        listIndex := v_index(p_sessionRecord.process_id);
+        g_sessionList(listIndex) := p_sessionRecord;
     end;
 
 	------------------------------------------------------------------------------------------------
 
     -- removes a record from the internal process list
-    procedure removeProcess(p_processId number)
+    procedure removeSession(p_processId number)
     as
         listIndex number;
         v_old_idx PLS_INTEGER;
@@ -321,7 +321,7 @@ create or replace PACKAGE BODY LILA AS
             -- get list index
             v_old_idx := v_index(p_processId);            
             -- delete from internal list
-            processList.DELETE(v_old_idx);            
+            g_sessionList.DELETE(v_old_idx);            
             -- delete index
             v_index.DELETE(p_processId);     
         end if;       
@@ -330,26 +330,26 @@ create or replace PACKAGE BODY LILA AS
 	------------------------------------------------------------------------------------------------
 
     -- Creating and adding a new record to the process list
-    procedure insertProcess (p_tabName varchar2, p_processId number, p_logLevel number)
+    procedure insertSession (p_tabName varchar2, p_processId number, p_logLevel number)
     as
         v_new_idx PLS_INTEGER;
     begin
-        if processList is null then
-                processList := t_process_tab(); 
+        if g_sessionList is null then
+                g_sessionList := t_session_tab(); 
         end if;
 
-        if getProcessRecord(p_processId).process_id is null then
+        if getSessionRecord(p_processId).process_id is null then
             -- neuer Datensatz
-            processList.extend;
-            v_new_idx := processList.last;
+            g_sessionList.extend;
+            v_new_idx := g_sessionList.last;
         else
             v_new_idx := v_index(p_processId);
         end if;
 
-        processList(v_new_idx).process_id      := p_processId;
-        processList(v_new_idx).counter_details := 0;
-        processList(v_new_idx).log_level       := p_logLevel;
-        processList(v_new_idx).tabName_prefix  := p_tabName;
+        g_sessionList(v_new_idx).process_id      := p_processId;
+        g_sessionList(v_new_idx).counter_details := 0;
+        g_sessionList(v_new_idx).log_level       := p_logLevel;
+        g_sessionList(v_new_idx).tabName_prefix  := p_tabName;
 
         v_index(p_processId) := v_new_idx;
     end;
@@ -359,11 +359,11 @@ create or replace PACKAGE BODY LILA AS
     -- Whatever you want
     function test(p_processId number) return varchar2
     as
-        processRecord t_process_rec;
+        processRecord t_session_rec;
     begin
 		-- example:
 		-- select pck_logging.test(0) from dual;
-        processRecord := getProcessRecord(p_processId);        
+        processRecord := getSessionRecord(p_processId);        
         return 'prefix: ' ||processRecord.tabName_prefix || '; counter: ' || nvl(processRecord.counter_details, 0) || '; log_level: ' || nvl(processRecord.log_level, 0);
     end;
 
@@ -378,11 +378,11 @@ create or replace PACKAGE BODY LILA AS
     as 
         pragma autonomous_transaction;
         sqlStatement varchar2(2000);
-        processRecord t_process_rec;
+        processRecord t_session_rec;
     begin
-        processRecord := getProcessRecord(p_processId);
+        processRecord := getSessionRecord(p_processId);
         processRecord.counter_details := processRecord.counter_details +1;
-        updateProcessRecord(processRecord);
+        updateSessionRecord(processRecord);
 
         sqlStatement := '
         insert into PH_LILA_DETAIL_TABLE_NAME (
@@ -406,11 +406,11 @@ create or replace PACKAGE BODY LILA AS
     as 
         pragma autonomous_transaction;
         sqlStatement varchar2(4000);
-        processRecord t_process_rec;
+        processRecord t_session_rec;
     begin
-        processRecord := getProcessRecord(p_processId);
+        processRecord := getSessionRecord(p_processId);
         processRecord.counter_details := processRecord.counter_details +1;
-        updateProcessRecord(processRecord);
+        updateSessionRecord(processRecord);
 
         sqlStatement := '
         insert into PH_LILA_DETAIL_TABLE_NAME (
@@ -434,11 +434,11 @@ create or replace PACKAGE BODY LILA AS
     as 
         pragma autonomous_transaction;
         sqlStatement varchar2(4000);
-        processRecord t_process_rec;
+        processRecord t_session_rec;
     begin
-        processRecord := getProcessRecord(p_processId);
+        processRecord := getSessionRecord(p_processId);
         processRecord.counter_details := processRecord.counter_details +1;
-        updateProcessRecord(processRecord);
+        updateSessionRecord(processRecord);
 
         sqlStatement := '
         insert into PH_LILA_DETAIL_TABLE_NAME (
@@ -465,7 +465,7 @@ create or replace PACKAGE BODY LILA AS
     procedure DEBUG(p_processId number, p_stepInfo varchar2)
     as
     begin
-        if logLevelDebug <= getProcessRecord(p_processId).log_level then
+        if logLevelDebug <= getSessionRecord(p_processId).log_level then
             write_debug_info(p_processId, p_stepInfo, logLevelDebug);
         end if;
     end;
@@ -477,7 +477,7 @@ create or replace PACKAGE BODY LILA AS
     procedure INFO(p_processId number, p_stepInfo varchar2)
     as
     begin
-        if logLevelInfo <= getProcessRecord(p_processId).log_level then
+        if logLevelInfo <= getSessionRecord(p_processId).log_level then
             log_detail(p_processId, p_stepInfo, logLevelInfo);
         end if;
     end;
@@ -489,7 +489,7 @@ create or replace PACKAGE BODY LILA AS
     procedure ERROR(p_processId number, p_stepInfo varchar2)
     as
     begin
-        if logLevelError <= getProcessRecord(p_processId).log_level then
+        if logLevelError <= getSessionRecord(p_processId).log_level then
             write_error_stack(p_processId, p_stepInfo, logLevelError);
         end if;
     end;
@@ -501,7 +501,7 @@ create or replace PACKAGE BODY LILA AS
     procedure WARN(p_processId number, p_stepInfo varchar2)
     as
     begin
-        if logLevelWarn <= getProcessRecord(p_processId).log_level then
+        if logLevelWarn <= getSessionRecord(p_processId).log_level then
             log_detail(p_processId, p_stepInfo, logLevelWarn);
         end if;
     end;
@@ -616,11 +616,11 @@ dbms_output.put_line('lStepCounter after: ' || lStepCounter);
         pragma autonomous_transaction;
         sqlStatement varchar2(500);
     begin
-        if getProcessRecord(p_processId).process_id is null then
+        if getSessionRecord(p_processId).process_id is null then
             return;
         end if;
 
-		if getProcessRecord(p_processId).log_level > logLevelSilent then
+		if getSessionRecord(p_processId).log_level > logLevelSilent then
 	        sqlStatement := '
 	        update PH_LILA_TABLE_NAME
 	        set process_end = current_timestamp
@@ -629,7 +629,7 @@ dbms_output.put_line('lStepCounter after: ' || lStepCounter);
 	        execute immediate sqlStatement;
 	        commit;
         end if;
-        processList.delete(p_processId);
+        g_sessionList.delete(p_processId);
     end;
 
 	------------------------------------------------------------------------------------------------
@@ -641,11 +641,11 @@ dbms_output.put_line('lStepCounter after: ' || lStepCounter);
         pragma autonomous_transaction;
         sqlStatement varchar2(500);
     begin
-        if getProcessRecord(p_processId).process_id is null then
+        if getSessionRecord(p_processId).process_id is null then
             return;
         end if;
 
-		if getProcessRecord(p_processId).log_level > logLevelSilent then
+		if getSessionRecord(p_processId).log_level > logLevelSilent then
 	        sqlStatement := '
 	        update PH_LILA_TABLE_NAME
 	        set process_end = current_timestamp';
@@ -668,7 +668,7 @@ dbms_output.put_line('lStepCounter after: ' || lStepCounter);
 	        execute immediate sqlStatement;
 	        commit;
         end if;
-        processList.delete(p_processId);
+        g_sessionList.delete(p_processId);
     end;
 
 	------------------------------------------------------------------------------------------------
@@ -700,7 +700,7 @@ dbms_output.put_line('lStepCounter after: ' || lStepCounter);
         end if;
 
         select seq_lila_log.nextVal into pProcessId from dual;
-        insertProcess (p_tabNamePrefix, pProcessId, p_logLevel);
+        insertSession (p_tabNamePrefix, pProcessId, p_logLevel);
 
 		if p_logLevel > logLevelSilent then
 	        deleteOldLogs(pProcessId, upper(trim(p_processName)), p_daysToKeep);

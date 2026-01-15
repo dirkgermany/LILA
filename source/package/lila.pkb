@@ -11,11 +11,11 @@ create or replace PACKAGE BODY LILA AS
     -- Table for several processes
     TYPE t_process_tab IS TABLE OF t_process_rec;
     processList t_process_tab := null;
-    
+
     -- Index for entries in process list
     TYPE t_search_idx IS TABLE OF PLS_INTEGER INDEX BY BINARY_INTEGER;
     v_index t_search_idx;
-    
+
     -- Placeholders for Statements
     PH_LILA_TABLE_NAME constant varchar2(30) := 'PH_LILA_TABLE_NAME';
     PH_LILA_DETAIL_TABLE_NAME constant varchar2(30) := 'PH_LILA_DETAIL_TABLE_NAME';
@@ -34,7 +34,7 @@ create or replace PACKAGE BODY LILA AS
     PH_ERR_STACK constant varchar2(30) := 'PH_ERR_STACK';
     PH_ERR_BACKTRACE constant varchar2(30) := 'PH_ERR_BACKTRACE';
 
-    
+
     cr constant varchar2(2) := chr(13) || chr(10);
     function getProcessRecord(p_processId number) return t_process_rec;
 
@@ -42,7 +42,7 @@ create or replace PACKAGE BODY LILA AS
         Internal methods.
         Internal methods are written in lowercase and camelCase
     */    
-    
+
     -- Delivers number logLevel as string
     function getLogLevelAsText(p_logLevelNumber number) return varchar2
     as
@@ -55,9 +55,9 @@ create or replace PACKAGE BODY LILA AS
             else return 'UNKNOWN';
         end case;
     end;
-	
+
 	------------------------------------------------------------------------------------------------
-    
+
     -- Checks if a table exists physically
     function tableExists(p_TabName varchar2) return boolean
     as
@@ -67,14 +67,14 @@ create or replace PACKAGE BODY LILA AS
         into tableCount
         from user_tables
         where table_name = upper(p_tabName);
-    
+
         if tableCount > 0 then
             return true;
         else
             return false;
         end if;
     end;
-    
+
 	------------------------------------------------------------------------------------------------
 
     -- Checks if a database sequence exists
@@ -87,13 +87,13 @@ create or replace PACKAGE BODY LILA AS
         from user_objects
         where object_name = upper(p_SequenceName)
         and   object_type = 'SEQUENCE';
-    
+
         if sequenceCount > 0 then
             return true;
         else
             return false;
         end if;    end;
-    
+
 	------------------------------------------------------------------------------------------------
 
     -- Creates LOG tables and the sequence for the process IDs if tables or sequence don't exist
@@ -106,7 +106,7 @@ create or replace PACKAGE BODY LILA AS
             sqlStmt := 'CREATE SEQUENCE SEQ_LILA_LOG MINVALUE 0 MAXVALUE 9999999999999999999999999999 INCREMENT BY 1 START WITH 1 CACHE 10 NOORDER  NOCYCLE  NOKEEP  NOSCALE  GLOBAL';
             execute immediate sqlStmt;
         end if;
-        
+
         if not tableExists(p_TabNamePrefix) then
             -- Basic table
             sqlStmt := '
@@ -122,7 +122,7 @@ create or replace PACKAGE BODY LILA AS
             )';
             sqlStmt := replace(sqlStmt, 'NEW_TABLE_NAME', p_TabNamePrefix);
             execute immediate sqlStmt;
-              
+
             -- Details table
             sqlStmt := '
             create table NEW_DETAIL_TABLE_NAME (
@@ -138,13 +138,13 @@ create or replace PACKAGE BODY LILA AS
                 err_callstack clob
             )';
             sqlStmt := replace(sqlStmt, 'NEW_DETAIL_TABLE_NAME', p_TabNamePrefix || '_DETAIL');
-            dbms_output.put_line('sql: ' || sqlStmt);
             execute immediate sqlStmt;
 
         end if;
-        
+
     exception      
         when others then
+        dbms_output.enable();
         dbms_output.put_line('Fehler...');
         dbms_output.put_line(sqlerrm);
         dbms_output.put_line(sqlStmt);
@@ -164,8 +164,9 @@ create or replace PACKAGE BODY LILA AS
     begin
         -- find record which relates to the process id
         processRecord := getProcessRecord(pProcessId);
-
-		-- not nice but saves memory actions
+        
+        /*
+            später tauschen, wenn der Rest funktioniert
         replacedString := replace(
             replace(
                 replace(
@@ -199,9 +200,8 @@ create or replace PACKAGE BODY LILA AS
                 ), PH_ERR_STACK, DBMS_UTILITY.FORMAT_ERROR_STACK
             ), PH_ERR_BACKTRACE, DBMS_UTILITY.FORMAT_ERROR_BACKTRACE
         );
+        */
 
-/*
-	old variant performs many memory allocations
         replacedString := replace(replacedString, PH_LILA_TABLE_NAME, processRecord.tabName_prefix);
         replacedString := replace(replacedString, PH_LILA_DETAIL_TABLE_NAME,  processRecord.tabName_prefix || '_DETAIL');
         replacedString := replace(replacedString, PH_PROCESS_NAME, pProcessName);
@@ -218,7 +218,7 @@ create or replace PACKAGE BODY LILA AS
         replacedString := replace(replacedString, PH_ERR_CALLSTACK, DBMS_UTILITY.FORMAT_CALL_STACK);
         replacedString := replace(replacedString, PH_ERR_STACK, DBMS_UTILITY.FORMAT_ERROR_STACK);
         replacedString := replace(replacedString, PH_ERR_BACKTRACE, DBMS_UTILITY.FORMAT_ERROR_BACKTRACE);
-*/
+
         return replacedString;
     end;
 
@@ -235,16 +235,17 @@ create or replace PACKAGE BODY LILA AS
         if p_daysToKeep is null then
             return;
         end if;
-        
+
         -- find out process IDs
         sqlStatement := '
         select id from PH_LILA_TABLE_NAME
         where process_end <= sysdate - PH_DAYS_TO_KEEP
         and upper(process_name) = upper(''PH_PROCESS_NAME'')';
         
+
         sqlStatement := replacePlaceHolders(p_processId, sqlStatement, p_processName, null, null, null, null, null, null);
         sqlStatement := replace(sqlStatement, 'PH_DAYS_TO_KEEP', to_char(p_daysToKeep));
-        
+
         -- for all process IDs
         open t_rc for sqlStatement;
         loop
@@ -255,11 +256,11 @@ create or replace PACKAGE BODY LILA AS
             sqlStatement := '
             delete from PH_LILA_TABLE_NAME
             where id = PH_ID';
-            
+
             sqlStatement := replacePlaceHolders(p_processId, sqlStatement, null, null, null, null, null, null, null);
             sqlStatement := replace(sqlStatement, 'PH_ID', to_char(pProcessIdToDelete));
             execute immediate sqlStatement;
-            
+
             -- kill entries from log details table
             sqlStatement := '
             delete from PH_LILA_DETAIL_TABLE_NAME
@@ -267,10 +268,10 @@ create or replace PACKAGE BODY LILA AS
             sqlStatement := replacePlaceHolders(p_processId, sqlStatement, null, null, null, null, null, null, null);
             sqlStatement := replace(sqlStatement, 'PH_ID', to_char(pProcessIdToDelete));
             execute immediate sqlStatement;
-            
+
         end loop;
         close t_rc;  
-        
+
         execute immediate sqlStatement;
     end;
 
@@ -278,7 +279,7 @@ create or replace PACKAGE BODY LILA AS
     /*
 		Methods dedicated to the processList
 	*/
-    
+
     -- Delivers a record of the internal list which belongs to the process id
     -- Return value is NULL BUT! datatype RECORD cannot be validated by IS NULL.
     -- RECORDs are always initialized.
@@ -291,11 +292,11 @@ create or replace PACKAGE BODY LILA AS
         if not v_index.EXISTS(p_processId) THEN
             return null;
         end if;
-        
+
         listIndex := v_index(p_processId);
         return processList(listIndex);
     end;
-    
+
 	------------------------------------------------------------------------------------------------
 
     -- Set values of a stored record in the internal process list by a given record
@@ -325,7 +326,7 @@ create or replace PACKAGE BODY LILA AS
             v_index.DELETE(p_processId);     
         end if;       
     end;
-    
+
 	------------------------------------------------------------------------------------------------
 
     -- Creating and adding a new record to the process list
@@ -333,12 +334,10 @@ create or replace PACKAGE BODY LILA AS
     as
         v_new_idx PLS_INTEGER;
     begin
-        dbms_output.enable();
-        
         if processList is null then
                 processList := t_process_tab(); 
         end if;
-                
+
         if getProcessRecord(p_processId).process_id is null then
             -- neuer Datensatz
             processList.extend;
@@ -351,7 +350,7 @@ create or replace PACKAGE BODY LILA AS
         processList(v_new_idx).counter_details := 0;
         processList(v_new_idx).log_level       := p_logLevel;
         processList(v_new_idx).tabName_prefix  := p_tabName;
-        
+
         v_index(p_processId) := v_new_idx;
     end;
 
@@ -367,9 +366,9 @@ create or replace PACKAGE BODY LILA AS
         processRecord := getProcessRecord(p_processId);        
         return 'prefix: ' ||processRecord.tabName_prefix || '; counter: ' || nvl(processRecord.counter_details, 0) || '; log_level: ' || nvl(processRecord.log_level, 0);
     end;
-    
+
 	------------------------------------------------------------------------------------------------
-	
+
 	/*
 		Internal methods dedicated to logging
 	*/
@@ -384,7 +383,7 @@ create or replace PACKAGE BODY LILA AS
         processRecord := getProcessRecord(p_processId);
         processRecord.counter_details := processRecord.counter_details +1;
         updateProcessRecord(processRecord);
-        
+
         sqlStatement := '
         insert into PH_LILA_DETAIL_TABLE_NAME (
             process_id, no, info, log_level,
@@ -398,7 +397,7 @@ create or replace PACKAGE BODY LILA AS
         execute immediate sqlStatement;
         commit;
     end;
-    
+
 	------------------------------------------------------------------------------------------------
 
     -- Writes a record to the details log table with debugging infos
@@ -412,7 +411,7 @@ create or replace PACKAGE BODY LILA AS
         processRecord := getProcessRecord(p_processId);
         processRecord.counter_details := processRecord.counter_details +1;
         updateProcessRecord(processRecord);
-        
+
         sqlStatement := '
         insert into PH_LILA_DETAIL_TABLE_NAME (
             process_id, no, info, log_level,
@@ -426,7 +425,7 @@ create or replace PACKAGE BODY LILA AS
         execute immediate sqlStatement;
         commit;
     end;
-    
+
 	------------------------------------------------------------------------------------------------
 
     -- Writes a record to the details log table with error infos
@@ -440,7 +439,7 @@ create or replace PACKAGE BODY LILA AS
         processRecord := getProcessRecord(p_processId);
         processRecord.counter_details := processRecord.counter_details +1;
         updateProcessRecord(processRecord);
-        
+
         sqlStatement := '
         insert into PH_LILA_DETAIL_TABLE_NAME (
             process_id, no, info, log_level,
@@ -451,7 +450,7 @@ create or replace PACKAGE BODY LILA AS
             ''PH_SESSION_USER'', ''PH_HOST_NAME'', ''PH_ERR_STACK'', ''PH_ERR_BACKTRACE'', ''PH_ERR_CALLSTACK''
         )';
         sqlStatement := replacePlaceHolders(p_processId, sqlStatement, null, null, null, p_stepInfo, null, null, p_logLevel);
-        
+
         execute immediate sqlStatement;
         commit;
     end;
@@ -494,7 +493,7 @@ create or replace PACKAGE BODY LILA AS
             write_error_stack(p_processId, p_stepInfo, logLevelError);
         end if;
     end;
-    
+
 	------------------------------------------------------------------------------------------------
 
     -- Used by external Procedure to write a new log entry with log level WARN
@@ -506,7 +505,7 @@ create or replace PACKAGE BODY LILA AS
             log_detail(p_processId, p_stepInfo, logLevelWarn);
         end if;
     end;
-    
+
 	------------------------------------------------------------------------------------------------
 
     -- Writes data to the log detail table.
@@ -516,7 +515,7 @@ create or replace PACKAGE BODY LILA AS
     begin
         write_detail(p_processId, p_stepInfo, p_logLevel);
     end;
-    
+
 	------------------------------------------------------------------------------------------------
 
     -- Updates the status of a log entry in the main log table.
@@ -533,7 +532,7 @@ create or replace PACKAGE BODY LILA AS
         execute immediate sqlStatement;
         commit;
     end;
-    
+
 	------------------------------------------------------------------------------------------------
 
     -- Updates the status and the info field of a log entry in the main log table.
@@ -578,10 +577,9 @@ create or replace PACKAGE BODY LILA AS
     begin
         sqlStatement := '
         update PH_LILA_TABLE_NAME
-        set steps_todo = PH_STEPS_DONE 
+        set steps_done = PH_STEPS_DONE 
         where id = PH_PROCESS_ID';   
-        sqlStatement := replacePlaceHolders(p_processId, sqlStatement, null, null, null, null, null, null, null);
-        sqlStatement := replace(sqlStatement, 'PH_STEPS_DONE', to_char(p_stepsDone));
+        sqlStatement := replacePlaceHolders(p_processId, sqlStatement, null, null, null, null, null, p_stepsDone, null);
         execute immediate sqlStatement;
         commit;
     end;
@@ -598,9 +596,14 @@ create or replace PACKAGE BODY LILA AS
         from PH_LILA_TABLE_NAME
         where id = PH_PROCESS_ID';   
         sqlStatement := replacePlaceHolders(p_processId, sqlStatement, null, null, null, null, null, null, null);
-        execute immediate sqlStatement into lStepCounter;
         
-        lStepCounter := lStepCounter +1;
+dbms_output.enable();
+dbms_output.put_line('STEP_DONE: ' || sqlStatement);
+        execute immediate sqlStatement into lStepCounter;
+
+dbms_output.put_line('lStepCounter before: ' || lStepCounter);
+        lStepCounter := nvl(lStepCounter, 0) +1;
+dbms_output.put_line('lStepCounter after: ' || lStepCounter);
         set_steps_done(p_processId, lStepCounter);
     end;
 
@@ -610,8 +613,23 @@ create or replace PACKAGE BODY LILA AS
     -- Important! Ignores if the process doesn't exist! No exception is thrown!
     procedure CLOSE_SESSION(p_processId number)
     as
+        pragma autonomous_transaction;
+        sqlStatement varchar2(500);
     begin
-        close_session(p_processId, null, null, null, null);
+        if getProcessRecord(p_processId).process_id is null then
+            return;
+        end if;
+
+		if getProcessRecord(p_processId).log_level > logLevelSilent then
+	        sqlStatement := '
+	        update PH_LILA_TABLE_NAME
+	        set process_end = current_timestamp
+	        where id = PH_PROCESS_ID';   
+	        sqlStatement := replacePlaceHolders(p_processId, sqlStatement, null, null, null, null, null, null, null);
+	        execute immediate sqlStatement;
+	        commit;
+        end if;
+        processList.delete(p_processId);
     end;
 
 	------------------------------------------------------------------------------------------------
@@ -655,10 +673,7 @@ create or replace PACKAGE BODY LILA AS
 
 	------------------------------------------------------------------------------------------------
 
-    -- Opens/starts a new logging session.
-    -- The returned process id must be stored within the calling procedure because it is the reference
-    -- which is recommended for all following actions (e.g. CLOSE_SESSION, DEBUG, SET_PROCESS_STATUS).
-	function NEW_SESSION(p_processName VARCHAR2, p_logLevel NUMBER, p_stepsToDo NUMBER, p_daysToKeep NUMBER, p_tabNamePrefix VARCHAR2 DEFAULT 'LILA_PROCESS') return number
+    function NEW_SESSION(p_processName VARCHAR2, p_logLevel NUMBER, p_stepsToDo NUMBER, p_daysToKeep NUMBER, p_tabNamePrefix VARCHAR2 DEFAULT 'LILA_PROCESS') return number
     as
         lProcessId number;
     begin
@@ -683,13 +698,13 @@ create or replace PACKAGE BODY LILA AS
 	        -- Sicherstellen, dass die LOG-Tabellen existieren
 	        createLogTables(p_tabNamePrefix);
         end if;
-        
+
         select seq_lila_log.nextVal into pProcessId from dual;
         insertProcess (p_tabNamePrefix, pProcessId, p_logLevel);
 
 		if p_logLevel > logLevelSilent then
 	        deleteOldLogs(pProcessId, upper(trim(p_processName)), p_daysToKeep);
-	        
+
 	        sqlStatement := '
 	        insert into PH_LILA_TABLE_NAME (
 	            id,
@@ -713,11 +728,12 @@ create or replace PACKAGE BODY LILA AS
 	        from dual';
 	        sqlStatement := replacePlaceHolders(pProcessId, sqlStatement, p_processName, null, null, null, null, null, null);
 	        execute immediate sqlStatement;     
-	        
+
 	        commit;
         end if;
         return pProcessId;
     end;
+    
 	------------------------------------------------------------------------------------------------
 
     PROCEDURE IS_ALIVE

@@ -117,10 +117,8 @@ logLevelDebug   constant number := 8;
 ```
     
 ## Functions and Procedures
-Shortcuts for parameter requirement:
-* <a id="M"> Mandatory</a>
-* <a id="O"> Optional</a>
-* <a id="N"> Nullable</a>
+
+### List of Functions and Procedures
 
 | Name               | Type      | Description                         | Scope
 | ------------------ | --------- | ----------------------------------- | -------
@@ -136,6 +134,12 @@ Shortcuts for parameter requirement:
 | [`ERROR`](#general-logging-procedures) | Procedure | Writes ERROR log entry              | Detail Logging
 | [`LOG_DETAIL`](#procedure-log_detail) | Procedure | Writes log entry with any log level | Detail Logging
 | [`PROCEDURE IS_ALIVE`](#procedure-is-alive) | Procedure | Excecutes a very simple logging session | Test
+
+
+### Shortcuts for parameter requirement
+* <a id="M"> Mandatory</a>
+* <a id="O"> Optional</a>
+* <a id="N"> Nullable</a>
 
 ### Session related Functions and Procedures
 #### Function NEW_SESSION

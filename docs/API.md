@@ -67,7 +67,7 @@ Ideally, the Log Session begins when the process starts and ends when the proces
 **During** the Log Session this one log entry can be updated and additional informations can be written to the *detail table*.
 **At the end** of a Log Session the log entry again can be updated.
 
-Although the lack of a regular log session termination (e.g., due to an uncaught exception in the calling process) is technically unsound, it does not ultimately lead to any real problems.
+Although the lack of a regular log session termination (e.g., due to an uncaught exception in the calling process) is technically unsound, it does not ultimately lead to any real problems. The only exception is that the end of the process is not logged.
 
 Ultimately, all that is required for a complete life cycle is to call the NEW_SESSION function at the beginning of the session and the CLOSE_SESSION procedure at the end of the session.
 

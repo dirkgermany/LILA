@@ -732,7 +732,6 @@ create or replace PACKAGE BODY LILA AS
         if getSessionRecord(p_processId).process_id is null then
             return;
         end if;
-            dbms_output.enable();
 
 		if getSessionRecord(p_processId).log_level > logLevelSilent then
 	        sqlStatement := '
@@ -755,11 +754,8 @@ create or replace PACKAGE BODY LILA AS
             
             sqlStatement := sqlStatement || ' where id = PH_PROCESS_ID'; 
 	        sqlStatement := replacePlaceHolders(p_processId, sqlStatement, null, p_status, p_processInfo, null, p_stepsToDo, p_stepsDone, null);
-            dbms_output.put_line(sqlStatement);
 	        execute immediate sqlStatement;
 	        commit;
-            
-            dbms_output.put_line('committed');
         end if;
         g_sessionList.delete(p_processId);
     end;
@@ -772,7 +768,6 @@ create or replace PACKAGE BODY LILA AS
         sqlStatement varchar2(600);
         pProcessId number(19,0);
     begin
-    dbms_output.enable();
        -- If silent log mode don't do anything
         if p_logLevel > logLevelSilent then
 	        -- Sicherstellen, dass die LOG-Tabellen existieren

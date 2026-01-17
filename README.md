@@ -19,7 +19,7 @@ LILA is developed by a developer who hates over-engineered tools. Focus: 5 minut
   - [How to log](#how-to-log)
 - [Monitoring](#monitoring)
   - [How to monitor](#how-to-monitor)
-
+- [Support the Project](#support-the-project)
 
 ## Key features
 1. **Lightweight**: One Package, two Tables, one Sequence. That's it.

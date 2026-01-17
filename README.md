@@ -5,6 +5,8 @@
 
 LILA is a lightweight logging and monitoring framework designed for Oracle PL/SQL applications. It provides a fast, parallel way to track processes. Its simple API allows for seamless integration into existing applications with minimal overhead.
 
+LILA utilizes autonomous transactions to ensure that all log entries are persisted, even if the main process performs a rollback.
+
 LILA is developed by a developer who hates over-engineered tools. Focus: 5 minutes to integrate, 100% visibility.
 
 ## Content
@@ -17,11 +19,12 @@ LILA is developed by a developer who hates over-engineered tools. Focus: 5 minut
 
 
 ## Key features
-2. **Lightweight**: One Package, two Tables, one Sequence. That's it.
-3. **Concurrent Logging**: Supports multiple, simultaneous log entries from the same or different sessions without blocking
-4. **Parallel Execution**: Designed for high-performance Oracle environments
+1. **Lightweight**: One Package, two Tables, one Sequence. That's it.
+2. **Concurrent Logging**: Supports multiple, simultaneous log entries from the same or different sessions without blocking
+3. **Parallel Execution**: Designed for high-performance Oracle environments
+4. **Data Integrity**: Uses autonomous transactions to guarantee log persistence regardless of the main transaction's outcome
 5. **Version Compatibility**: Fully tested on the latest Oracle AI Database 26ai (2026)
-7.**Monitoring**: You have the option to observe your applications via SQL or by the API
+6. **Monitoring**: You have the option to observe your applications via SQL or by the API
 
 ## Fast integration
 * Setting up LILA means creating a sequence and a package (refer [documentation file "setup.md"](docs/setup.md))

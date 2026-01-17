@@ -2,6 +2,9 @@
 [![Release](https://img.shields.io/github/v/release/dirkgermany/LILA-Logging)](https://github.com/dirkgermany/LILA-Logging/releases/latest)
 [![Lizenz](https://img.shields.io/github/license/dirkgermany/LILA-Logging)](https://github.com/dirkgermany/LILA-Logging/blob/main/LICENSE)
 [![Größe](https://img.shields.io/github/repo-size/dirkgermany/LILA-Logging)](https://https://github.com/dirkgermany/LILA-Logging)
+[![Sponsor](https://img.shields.io/badge/Sponsor-LILA-orange?style=flat-square&logo=github-sponsors)](https://github.com/sponsors/dirkgermany)
+
+
 
 LILA is a lightweight logging and monitoring framework designed for Oracle PL/SQL applications. It provides a fast, parallel way to track processes. Its simple API allows for seamless integration into existing applications with minimal overhead.
 
@@ -147,3 +150,11 @@ return 'ID = ' || id || '; Status: ' || lProcessStatus || '; Info: ' || lProcess
 SELECT my_app.getStatus(1) proc_status FROM dual;
 > ID = 1; Status: OK; Info: 'just working'; Steps completed: 42
 ```
+
+---
+### 💜 Support the Project
+Do you find **lila-logging** useful? Consider sponsoring the project to support its ongoing development and long-term maintenance.
+
+[![Beer](https://img.shields.io/badge/Buy%20me%20a%20beer-LILA-purple?style=for-the-badge&logo=buy-me-a-coffee)](https://github.com/sponsors/dirkgermany)
+
+

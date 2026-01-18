@@ -38,20 +38,6 @@ create or replace PACKAGE BODY LILA AS
         Internal methods.
         Internal methods are written in lowercase and camelCase
     */    
-
-    -- Delivers number logLevel as string
-    function getLogLevelAsText(p_logLevelNumber number) return varchar2
-    as
-    begin
-        case p_logLevelNumber
-            when logLevelSilent then return 'SILENT';
-            when logLevelError then return 'ERROR';
-            when logLevelInfo then return 'INFO';
-            when logLevelDebug then return 'DEBUG';
-            else return 'UNKNOWN';
-        end case;
-    end;
-
 	------------------------------------------------------------------------------------------------
 
     -- Checks if a table exists physically
@@ -685,7 +671,7 @@ create or replace PACKAGE BODY LILA AS
         pragma autonomous_transaction;
         sqlStatement varchar2(500);
         sessionRec t_session_rec;
-        sqlCursor number;
+        sqlCursor number := null;
         updateCount number;
     begin
         sessionRec := getSessionRecord(p_processId);
@@ -746,6 +732,7 @@ create or replace PACKAGE BODY LILA AS
             IF DBMS_SQL.IS_OPEN(sqlCursor) THEN
                 DBMS_SQL.CLOSE_CURSOR(sqlCursor);
             END IF;
+            sqlCursor := null;
 
     end;
 

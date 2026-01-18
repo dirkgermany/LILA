@@ -1,9 +1,3 @@
-/*
- * Copyright (c) 2026 Dirk Goldbach
- * Licensed under the MIT License.
- * See LICENSE file in the project root for full license information.
- */
-
 create or replace PACKAGE LILA AS
 
     /* Complete Doc and last version see https://github.com/dirkgermany/LILA */
@@ -20,8 +14,8 @@ create or replace PACKAGE LILA AS
     ------------------------------
     -- Life cycle of a log session
     ------------------------------
-    FUNCTION NEW_SESSION(p_processName VARCHAR2, p_logLevel NUMBER, p_daysToKeep NUMBER, p_tabNamePrefix VARCHAR2 default 'LILA_LOG') RETURN NUMBER;
-    FUNCTION NEW_SESSION(p_processName VARCHAR2, p_logLevel NUMBER, p_stepsToDo NUMBER, p_daysToKeep NUMBER, p_tabNamePrefix VARCHAR2 DEFAULT 'LILA_LOG') RETURN NUMBER;
+    FUNCTION NEW_SESSION(p_processName VARCHAR2, p_logLevel NUMBER, p_daysToKeep NUMBER, p_TabNameMaster VARCHAR2 default 'LILA_LOG') RETURN NUMBER;
+    FUNCTION NEW_SESSION(p_processName VARCHAR2, p_logLevel NUMBER, p_stepsToDo NUMBER, p_daysToKeep NUMBER, p_TabNameMaster VARCHAR2 DEFAULT 'LILA_LOG') RETURN NUMBER;
     PROCEDURE CLOSE_SESSION(p_processId NUMBER);
     PROCEDURE CLOSE_SESSION(p_processId NUMBER, p_stepsToDo NUMBER, p_stepsDone NUMBER, p_processInfo VARCHAR2, p_status NUMBER);
 
@@ -33,7 +27,7 @@ create or replace PACKAGE LILA AS
     PROCEDURE SET_STEPS_TODO(p_processId NUMBER, p_stepsToDo NUMBER);
     PROCEDURE SET_STEPS_DONE(p_processId NUMBER, p_stepsDone NUMBER);
     PROCEDURE STEP_DONE(p_processId NUMBER);
-    
+
     -------------------------------
     -- Request process informations
     FUNCTION GET_STEPS_DONE(p_processId NUMBER) RETURN NUMBER;
@@ -44,7 +38,7 @@ create or replace PACKAGE LILA AS
     FUNCTION GET_PROCESS_INFO(p_processId NUMBER) RETURN VARCHAR2;
 
     -------------------------------
-    
+
     ------------------
     -- Logging details
     ------------------
@@ -60,7 +54,7 @@ create or replace PACKAGE LILA AS
     ----------
     -- Check if LILA works
     PROCEDURE IS_ALIVE;
-    
+
     -- feel free
     FUNCTION test(p_processId NUMBER) RETURN VARCHAR2;
 

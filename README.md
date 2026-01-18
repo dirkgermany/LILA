@@ -113,7 +113,7 @@ Three options:
 #### Real-time Progress
 **Live-dashboard data**
 ```sql
-SELECT id, status, last_update, ... FROM lila_process WHERE process_name = ... (provides the current status of the process)
+SELECT id, status, last_update, ... FROM lila_log WHERE process_name = ... (provides the current status of the process)
 ```
 
 >| ID | PROCESS_NAME   | PROCESS_START         | PROCESS_END           | LAST_UPDATE           | STEPS_TO_DO | STEPS_DONE | STATUS | INFO
@@ -125,7 +125,7 @@ SELECT id, status, last_update, ... FROM lila_process WHERE process_name = ... (
 #### Deep Dive
 **Historical data**
 ```sql
-SELECT * FROM lila_process_detail WHERE process_id = ...
+SELECT * FROM lila_log_detail WHERE process_id = ...
 ```
 
 >| PROCESS_ID | NO | INFO           | LOG_LEVEL | SESSION_TIME    | SESSION_USER | HOST_NAME | ERR_STACK        | ERR_BACKTRACE    | ERR_CALLSTACK

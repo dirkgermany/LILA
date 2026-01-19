@@ -37,115 +37,40 @@ create or replace PACKAGE BODY LILA AS
     /*
         Internal methods.
         Internal methods are written in lowercase and camelCase
-    */    
-	------------------------------------------------------------------------------------------------
-
-    -- Checks if a table exists physically
-    function tableExists(p_TabName varchar2) return boolean
+    */
+    -- run execute immediate with exception handling
+    procedure run_sql(p_sqlStmt varchar2)
     as
-        tableCount number;
     begin
+        execute immediate p_sqlStmt;
+        
+    exception
+        when OTHERS then
+            DBMS_OUTPUT.PUT_LINE('DDL-Fehler bei: ' || p_sqlStmt);
+            RAISE;
+    end;
+    
+    -- Checks if a database sequence exists
+    function objectExists(p_objectName varchar2, p_objectType varchar2) return boolean
+    as
+        sqlStatement varchar2(200);
+        objectCount number;
+    begin
+        sqlStatement := '
         select count(*)
-        into tableCount
-        from user_tables
-        where table_name = upper(p_tabName);
+        from user_objects
+        where upper(object_name) = upper(:PH_OBJECT_NAME)
+        and   upper(object_type) = upper(:PH_OBJECT_TYPE)';
+        
+        execute immediate sqlStatement into objectCount using upper(p_objectName), upper(p_objectType);
 
-        if tableCount > 0 then
+        if objectCount > 0 then
             return true;
         else
             return false;
         end if;
     end;
 
-	------------------------------------------------------------------------------------------------
-
-    -- Checks if a database sequence exists
-    function sequenceExists(p_SequenceName varchar2) return boolean
-    as
-        sequenceCount number;
-    begin
-        select count(*)
-        into sequenceCount
-        from user_objects
-        where object_name = upper(p_SequenceName)
-        and   object_type = 'SEQUENCE';
-
-        if sequenceCount > 0 then
-            return true;
-        else
-            return false;
-        end if;    end;
-
-	------------------------------------------------------------------------------------------------
-
-    -- Creates LOG tables and the sequence for the process IDs if tables or sequence don't exist
-    -- For naming rules of the tables see package description
-    procedure createLogTables(p_TabNameMaster varchar2)
-    as
-        sqlStmt varchar2(500);
-    begin
-        if not sequenceExists('SEQ_LILA_LOG') then
-            sqlStmt := 'CREATE SEQUENCE SEQ_LILA_LOG MINVALUE 0 MAXVALUE 9999999999999999999999999999 INCREMENT BY 1 START WITH 1 CACHE 10 NOORDER  NOCYCLE  NOKEEP  NOSCALE  GLOBAL';
-            execute immediate sqlStmt;
-        end if;
-
-        if not tableExists(p_TabNameMaster) then
-            -- Master table
-            sqlStmt := '
-            create table NEW_TABLE_NAME ( 
-                id number(19,0),
-                process_name varchar2(100),
-                process_start timestamp(6),
-                process_end timestamp(6),
-                last_update timestamp(6),
-                steps_todo NUMBER,
-                steps_done number,
-                status number(1,0),
-                info clob
-            )';
-            sqlStmt := replace(sqlStmt, 'NEW_TABLE_NAME', p_TabNameMaster);
-            execute immediate sqlStmt;
-
-            sqlStmt := '
-			CREATE INDEX idx_lila_cleanup 
-			ON NEW_TABLE_NAME (process_name, process_end)';
-            sqlStmt := replace(sqlStmt, 'NEW_TABLE_NAME', p_TabNameMaster);
-            execute immediate sqlStmt;
-        end if;
-
-        if not tableExists(p_TabNameMaster || '_DETAIL') then
-            -- Details table
-            sqlStmt := '
-            create table NEW_DETAIL_TABLE_NAME (
-                process_id number(19,0),
-                no number(19,0),
-                info clob,
-                log_level varchar2(10),
-                session_time timestamp  DEFAULT SYSTIMESTAMP,
-                session_user varchar2(50),
-                host_name varchar2(50),
-                err_stack clob,
-                err_backtrace clob,
-                err_callstack clob
-            )';
-            sqlStmt := replace(sqlStmt, 'NEW_DETAIL_TABLE_NAME', p_TabNameMaster || '_DETAIL');
-            execute immediate sqlStmt;
-            
-            sqlStmt := '
-			CREATE INDEX idx_lila_detail_master
-			ON NEW_DETAIL_TABLE_NAME (process_id)';
-            sqlStmt := replace(sqlStmt, 'NEW_DETAIL_TABLE_NAME', p_TabNameMaster || '_DETAIL');
-            execute immediate sqlStmt;
-        end if;
-
-    exception      
-        when others then
-        dbms_output.enable();
-        dbms_output.put_line('Fehler...');
-        dbms_output.put_line(sqlerrm);
-        dbms_output.put_line(sqlStmt);
-     end;
-     
 	------------------------------------------------------------------------------------------------
 
     function replaceNameDetailTable(p_sqlStatement varchar2, p_placeHolder varchar2, p_tableName varchar2) return varchar2
@@ -161,7 +86,82 @@ create or replace PACKAGE BODY LILA AS
     begin
         return replace(p_sqlStatement, p_placeHolder, p_tableName);
     end;
+    
+	------------------------------------------------------------------------------------------------
 
+    -- Creates LOG tables and the sequence for the process IDs if tables or sequence don't exist
+    -- For naming rules of the tables see package description
+    procedure createLogTables(p_TabNameMaster varchar2)
+    as
+        sqlStmt varchar2(500);
+    begin
+        if not objectExists('SEQ_LILA_LOG', 'SEQUENCE') then
+            sqlStmt := 'CREATE SEQUENCE SEQ_LILA_LOG MINVALUE 0 MAXVALUE 9999999999999999999999999999 INCREMENT BY 1 START WITH 1 CACHE 10 NOORDER  NOCYCLE  NOKEEP  NOSCALE  GLOBAL';
+            execute immediate sqlStmt;
+        end if;
+
+        if not objectExists(p_TabNameMaster, 'TABLE') then
+            -- Master table
+            sqlStmt := '
+            create table PH_MASTER_TABLE ( 
+                id number(19,0),
+                process_name varchar2(100),
+                process_start timestamp(6),
+                process_end timestamp(6),
+                last_update timestamp(6),
+                steps_todo NUMBER,
+                steps_done number,
+                status number(1,0),
+                info clob
+            )';
+            sqlStmt := replaceNameMasterTable(sqlStmt, PARAM_MASTER_TABLE, p_TabNameMaster);
+            run_sql(sqlStmt);
+        end if;
+
+        if not objectExists(p_TabNameMaster || SUFFIX_DETAIL_NAME, 'TABLE') then
+            -- Details table
+            sqlStmt := '
+            create table PH_DETAIL_TABLE (
+                process_id number(19,0),
+                no number(19,0),
+                info clob,
+                log_level varchar2(10),
+                session_time timestamp  DEFAULT SYSTIMESTAMP,
+                session_user varchar2(50),
+                host_name varchar2(50),
+                err_stack clob,
+                err_backtrace clob,
+                err_callstack clob
+            )';
+            sqlStmt := replaceNameDetailTable(sqlStmt, PARAM_DETAIL_TABLE, p_TabNameMaster);
+            run_sql(sqlStmt);
+            
+        end if;
+        
+        if not objectExists('idx_lila_detail_master', 'INDEX') then
+            sqlStmt := '
+			CREATE INDEX idx_lila_detail_master
+			ON PH_DETAIL_TABLE (process_id)';
+            sqlStmt := replaceNameDetailTable(sqlStmt, PARAM_DETAIL_TABLE, p_TabNameMaster);
+            run_sql(sqlStmt);
+        end if;
+
+        if not objectExists('idx_lila_cleanup', 'INDEX') then
+            sqlStmt := '
+			CREATE INDEX idx_lila_cleanup 
+			ON PH_MASTER_TABLE (process_name, process_end)';
+            sqlStmt := replaceNameMasterTable(sqlStmt, PARAM_MASTER_TABLE, p_TabNameMaster);
+            run_sql(sqlStmt);
+        end if;
+
+    exception      
+        when others then
+        dbms_output.enable();
+        dbms_output.put_line('Fehler...');
+        dbms_output.put_line(sqlerrm);
+        dbms_output.put_line(sqlStmt);
+     end;
+     
 	------------------------------------------------------------------------------------------------
 
     -- Kills log entries depending to their age in days and process name.

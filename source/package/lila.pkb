@@ -852,11 +852,11 @@ create or replace PACKAGE BODY LILA AS
 
     PROCEDURE IS_ALIVE
     as
-        pProcessName number(19,0);
+        pProcessId number(19,0);
     begin
-        pProcessName := new_session('LILA Life Check', logLevelDebug, null);
-        debug(pProcessName, 'First Message of LILA: All requirements are met!');
-        close_session(pProcessName, 1, 1, 'OK', 1);
+        pProcessId := new_session('LILA Life Check', logLevelDebug, null);
+        debug(pProcessId, 'First Message of LILA: All requirements are met!');
+        close_session(pProcessId, 1, 1, 'Hello world, it''s me - LILA', 1);
         dbms_output.put_line('Hello world, it''s me - LILA');
     end;
 

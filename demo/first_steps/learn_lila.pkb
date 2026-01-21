@@ -23,6 +23,8 @@ create or replace PACKAGE BODY LEARN_LILA AS
         lila.close_session(lProcessId);
     end;
 
+    -- Shows how an application can be monitored.
+    -- For simplicity, this example uses dbms_output. Therefore, please activate the DBMS_OUTPUT window.
     -- Starts without steps, sets steps_todo after starting and increments the completed steps
     -- No detail will be written
     procedure increment_steps_and_monitor
@@ -31,17 +33,20 @@ create or replace PACKAGE BODY LEARN_LILA AS
     begin
         dbms_output.enable();
         lProcessId := lila.new_session('cycle with steps', lila.logLevelInfo, 1);
+        dbms_output.put_line('New log session ID: ' || lProcessId);
         lila.set_steps_todo(lProcessId, 10);
         dbms_output.put_line('Steps To Do: ' || lila.get_steps_todo(lProcessId));
         for i in 1..9 loop
             lila.step_done(lProcessId);
-            dbms_output.put_line('Steps: ' || lila.get_steps_done(lProcessId));
+            dbms_output.put_line('Some step completed: ' || i);
         end loop;
         lila.close_session(lProcessId, null, null, 'Too little', 4);
+        dbms_output.put_line('Log session finished and closed');
         dbms_output.put_line('Process Status: ' || lila.get_process_status(lProcessId));
-        dbms_output.put_line('Process Info: ' || lila.get_process_info(lProcessId));
-        dbms_output.put_line('Process Start: ' || lila.get_process_start(lProcessId));
-        dbms_output.put_line('Process End: ' || lila.get_process_end(lProcessId));
+        dbms_output.put_line('Process Info  : ' || lila.get_process_info(lProcessId));
+        dbms_output.put_line('Process Start : ' || lila.get_process_start(lProcessId));
+        dbms_output.put_line('Process End   : ' || lila.get_process_end(lProcessId));
+        dbms_output.put_line('Steps Done    : ' || lila.get_steps_done(lProcessId));
     end;
 
 

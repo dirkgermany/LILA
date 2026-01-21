@@ -11,6 +11,8 @@ This demo shows the basic API-calls (and there aren't many more) of LILA:
 * Writing log entries
 * Updating process (application) status
 
+This demo also includes an example of how the LILA API supports application **monitoring** (see procedure increment_steps_and_monitor).
+
 ---
 ## Prerequisites
 To try out this example only some steps must be done before.

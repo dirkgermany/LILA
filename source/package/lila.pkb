@@ -636,14 +636,49 @@ create or replace PACKAGE BODY LILA AS
 
 	------------------------------------------------------------------------------------------------
     
+    PROCEDURE CLOSE_SESSION(p_processId NUMBER, p_processInfo VARCHAR2, p_status NUMBER)
+    as
+    begin
+        close_session(
+            p_processId   => p_processId, 
+            p_stepsToDo   => null, 
+            p_stepsDone   => null, 
+            p_processInfo => p_processInfo, 
+            p_status      => p_status
+        );
+    end;
+    
+    PROCEDURE CLOSE_SESSION(p_processId NUMBER, p_stepsDone NUMBER, p_processInfo VARCHAR2, p_status NUMBER)
+    as
+    begin
+        close_session(
+            p_processId   => p_processId, 
+            p_stepsToDo   => null, 
+            p_stepsDone   => p_stepsDone, 
+            p_processInfo => p_processInfo, 
+            p_status      => p_status
+        );
+    end;
+
+
+    
     -- Ends an earlier started logging session by the process ID.
     -- Important! Ignores if the process doesn't exist! No exception is thrown!
     procedure CLOSE_SESSION(p_processId number)
     as
-        pragma autonomous_transaction;
-        sqlStatement varchar2(500);
-        sessionRec t_session_rec;
+--        pragma autonomous_transaction;
+--        sqlStatement varchar2(500);
+--        sessionRec t_session_rec;
     begin
+        close_session(
+            p_processId   => p_processId, 
+            p_stepsToDo   => null, 
+            p_stepsDone   => null, 
+            p_processInfo => null, 
+            p_status      => null
+        );
+        
+        /*
         sessionRec := getSessionRecord(p_processId);
         if getSessionRecord(p_processId).process_id is null then
             return;
@@ -656,11 +691,11 @@ create or replace PACKAGE BODY LILA AS
                 last_update = current_timestamp
 	        where id = :PH_PROCESS_ID';
             sqlStatement := replaceNameMasterTable(sqlStatement, PARAM_MASTER_TABLE, sessionRec.tabName_master);
-            sqlStatement := replaceNameMasterTable(sqlStatement, PARAM_MASTER_TABLE, sessionRec.tabName_master);        
 	        execute immediate sqlStatement using p_processId;
 	        commit;
         end if;
         g_sessionList.delete(p_processId);
+        */
     end;
 
 	------------------------------------------------------------------------------------------------
@@ -793,7 +828,12 @@ create or replace PACKAGE BODY LILA AS
     function NEW_SESSION(p_processName varchar2, p_logLevel number, p_tabNameMaster varchar2 default 'LILA_LOG') return number
     as
     begin
-        return new_session(p_processName, p_logLevel, null, null, p_tabNameMaster);
+        return new_session(
+            p_processName   => p_processName,
+            p_logLevel      => p_logLevel, 
+            p_daysToKeep    => null, 
+            p_stepsToDo     => null, 
+            p_tabNameMaster => p_tabNameMaster);
     end;
 
 
@@ -806,7 +846,13 @@ create or replace PACKAGE BODY LILA AS
 --        sqlStatement varchar2(600);
 --        pProcessId number(19,0);
     begin
-        return new_session(p_processName, p_logLevel, null, p_daysToKeep, p_tabNameMaster);
+        return new_session(
+            p_processName   => p_processName,
+            p_logLevel      => p_logLevel, 
+            p_daysToKeep    => p_daysToKeep, 
+            p_stepsToDo     => null, 
+            p_tabNameMaster => p_tabNameMaster);
+
     /*    
         -- If silent log mode don't do anything
         if p_logLevel > logLevelSilent then

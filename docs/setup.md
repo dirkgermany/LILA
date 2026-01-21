@@ -14,34 +14,35 @@ This does not apply to the name of the Sequence, which is mandatory.
 Also the schema user must have the necessary rights.
 As a rule, these rights should already be in place, as LILA is only a supplement to existing PL/SQL packages.
 
+---
+## Prerequisites
+If you are new to PL/SQL programming or are using a new database user to try out LILA, there may be a few Oracle-specific preparations to make.
+
+### Privileges of your schema user
+Grant the user certain rights (also with sysdba rights)
+```sql
+GRANT EXECUTE ANY PROCEDURE TO USER_NAME;
+GRANT SELECT ANY TABLE TO USER_NAME;
+GRANT CREATE TABLE TO USER_NAME;
+GRANT CREATE SESSION TO USER_NAME;
+GRANT EXECUTE ON UTL_HTTP TO USER_NAME;
+```
+
 ## Login to database schema
 Within your preferred sql tool (e.g. sqlDeveloper) login to the desired database schema.
 
 ## Creating Package
-Is done by copy&paste and execute
-1. Copy the complete content of lila.pks (the specification) into your preferred sql tool (e.g. sqlDeveloper) and execute the sql script
-2. Copy the complete content of lila.pkb (the body) and execute the sql script
-3. Open the new package LILA (perhaps you have to refresh the object tree in your sql tool)
+Find the package under https://github.com/dirkgermany/LILA-Logging/tree/main/source/package.
+
+Copy the complete content of lila.pks (specification) and lila.pkb (body) into your preferred sql tool (e.g. sqlDeveloper) and execute the sql script.
+After that you can see the package in your object tree (perhaps after refreshing it).
 
 That's it. If you got exceptions when executing the scripts please see [`Trouble Shooting`](#trouble-shooting).
 
 
 ## Trouble shooting
-### Permissions
-Most problems are caused by insufficient permissions.
-Log in to the database with DBA rights(*sys* or *system*).
-Execute the following statements. You may want to try this iteratively, executing one statement at a time and attempting to perform the setup steps immediately after each one.
-```sql
-GRANT CREATE SESSION TO <schema user>;
-GRANT CREATE TABLE TO <schema user>;
-GRANT CREATE PROCEDURE TO <schema user>;
-GRANT CREATE SEQUENCE TO <schema user>;
-```
+Hopefully not, but errors may occur when using LILA for the first time.
 
-If the user who executes your scripts, is not the same, you have to grant one more Privilege:
-```sql
-GRANT EXECUTE ON <schema user>.LILA TO <another schema user>;
-```
 ### Database Objects
 If, for any reason, one or all of the three required database objects are not automatically created when using the API, they can be created manually using the following statements if necessary.
 

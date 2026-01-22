@@ -6,8 +6,8 @@ create or replace PACKAGE BODY LILA AS
     -- Record representing the internal session
     TYPE t_session_rec IS RECORD (
         process_id      NUMBER(19,0),
-        counter_details NUMBER := 0,
-        log_level       NUMBER := 0,
+        counter_details PLS_INTEGER := 0,
+        log_level       PLS_INTEGER := 0,
         tabName_master  VARCHAR2(100)
     );
 
@@ -26,9 +26,9 @@ create or replace PACKAGE BODY LILA AS
         process_start TIMESTAMP,
         process_end TIMESTAMP,
         last_update TIMESTAMP,
-        steps_todo NUMBER,
-        steps_done NUMBER,
-        status NUMBER,
+        steps_todo PLS_INTEGER,
+        steps_done PLS_INTEGER,
+        status PLS_INTEGER,
         info CLOB
     );
 
@@ -38,8 +38,8 @@ create or replace PACKAGE BODY LILA AS
     TYPE t_monitor_rec IS RECORD (
         process_id number(19,0),
         action_name varchar2(25),
-        steps_done number,
-        max_steps number,
+        steps_done PLS_INTEGER,
+        max_steps PLS_INTEGER,
         avg_action_duration number      
     );
    
@@ -140,9 +140,9 @@ create or replace PACKAGE BODY LILA AS
                 process_start timestamp(6),
                 process_end timestamp(6),
                 last_update timestamp(6),
-                steps_todo NUMBER,
+                steps_todo number,
                 steps_done number,
-                status number(1,0),
+                status number(2,0),
                 info clob
             )';
             sqlStmt := replaceNameMasterTable(sqlStmt, PARAM_MASTER_TABLE, p_TabNameMaster);
@@ -739,7 +739,7 @@ create or replace PACKAGE BODY LILA AS
     
 	------------------------------------------------------------------------------------------------
 
-    function GET_STEPS_DONE(p_processId NUMBER) return number
+    function GET_STEPS_DONE(p_processId NUMBER) return PLS_INTEGER
     as
     begin
         return getProcessRecord(p_processId).steps_done;
@@ -747,7 +747,7 @@ create or replace PACKAGE BODY LILA AS
 
 	------------------------------------------------------------------------------------------------
 
-    function GET_STEPS_TODO(p_processId NUMBER) return number
+    function GET_STEPS_TODO(p_processId NUMBER) return PLS_INTEGER
     as
     begin
         return getProcessRecord(p_processId).steps_todo;
@@ -771,7 +771,7 @@ create or replace PACKAGE BODY LILA AS
 
 	------------------------------------------------------------------------------------------------
 
-    function GET_PROCESS_STATUS(p_processId number) return number
+    function GET_PROCESS_STATUS(p_processId number) return PLS_INTEGER
     as 
     begin
         return getProcessRecord(p_processId).status;

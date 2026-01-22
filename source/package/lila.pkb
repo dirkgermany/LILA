@@ -640,7 +640,7 @@ create or replace PACKAGE BODY LILA AS
 	------------------------------------------------------------------------------------------------
 
     -- Updates the status of a log entry in the main log table.
-    procedure SET_PROCESS_STATUS(p_processId number, p_status number)
+    procedure SET_PROCESS_STATUS(p_processId number, p_status PLS_INTEGER)
     as
         pragma autonomous_transaction;
         sqlStatement varchar2(500);
@@ -661,7 +661,7 @@ create or replace PACKAGE BODY LILA AS
 	------------------------------------------------------------------------------------------------
 
     -- Updates the status and the info field of a log entry in the main log table.
-    procedure SET_PROCESS_STATUS(p_processId number, p_status number, p_processInfo varchar2)
+    procedure SET_PROCESS_STATUS(p_processId number, p_status PLS_INTEGER, p_processInfo varchar2)
     as
         pragma autonomous_transaction;
         sqlStatement varchar2(500);
@@ -787,7 +787,7 @@ create or replace PACKAGE BODY LILA AS
 
 	------------------------------------------------------------------------------------------------
     
-    PROCEDURE CLOSE_SESSION(p_processId NUMBER, p_processInfo VARCHAR2, p_status NUMBER)
+    PROCEDURE CLOSE_SESSION(p_processId NUMBER, p_processInfo VARCHAR2, p_status PLS_INTEGER)
     as
     begin
         close_session(
@@ -799,7 +799,7 @@ create or replace PACKAGE BODY LILA AS
         );
     end;
     
-    PROCEDURE CLOSE_SESSION(p_processId NUMBER, p_stepsDone NUMBER, p_processInfo VARCHAR2, p_status NUMBER)
+    PROCEDURE CLOSE_SESSION(p_processId NUMBER, p_stepsDone NUMBER, p_processInfo VARCHAR2, p_status PLS_INTEGER)
     as
     begin
         close_session(
@@ -853,7 +853,7 @@ create or replace PACKAGE BODY LILA AS
 
     -- Ends an earlier started logging session by the process ID.
     -- Important! Ignores if the process doesn't exist! No exception is thrown!
-    procedure CLOSE_SESSION(p_processId number, p_stepsToDo number, p_stepsDone number, p_processInfo varchar2, p_status number)
+    procedure CLOSE_SESSION(p_processId number, p_stepsToDo number, p_stepsDone number, p_processInfo varchar2, p_status PLS_INTEGER)
     as
         pragma autonomous_transaction;
         sqlStatement varchar2(500);
@@ -925,7 +925,7 @@ create or replace PACKAGE BODY LILA AS
 
 	------------------------------------------------------------------------------------------------
 
-    function NEW_SESSION(p_processName VARCHAR2, p_logLevel NUMBER, p_stepsToDo NUMBER, p_daysToKeep NUMBER, p_tabNameMaster VARCHAR2 DEFAULT 'LILA_LOG') return number
+    function NEW_SESSION(p_processName VARCHAR2, p_logLevel PLS_INTEGER, p_stepsToDo NUMBER, p_daysToKeep NUMBER, p_tabNameMaster VARCHAR2 DEFAULT 'LILA_LOG') return number
     as
         pragma autonomous_transaction;
         sqlStatement varchar2(600);
@@ -976,7 +976,7 @@ create or replace PACKAGE BODY LILA AS
 
 	------------------------------------------------------------------------------------------------
 
-    function NEW_SESSION(p_processName varchar2, p_logLevel number, p_tabNameMaster varchar2 default 'LILA_LOG') return number
+    function NEW_SESSION(p_processName varchar2, p_logLevel PLS_INTEGER, p_tabNameMaster varchar2 default 'LILA_LOG') return number
     as
     begin
         return new_session(
@@ -991,7 +991,7 @@ create or replace PACKAGE BODY LILA AS
     -- Opens/starts a new logging session.
     -- The returned process id must be stored within the calling procedure because it is the reference
     -- which is recommended for all following actions (e.g. CLOSE_SESSION, DEBUG, SET_PROCESS_STATUS).
-    function NEW_SESSION(p_processName varchar2, p_logLevel number, p_daysToKeep number, p_tabNameMaster varchar2 default 'LILA_LOG') return number
+    function NEW_SESSION(p_processName varchar2, p_logLevel PLS_INTEGER, p_daysToKeep number, p_tabNameMaster varchar2 default 'LILA_LOG') return number
     as
 --        pragma autonomous_transaction;
 --        sqlStatement varchar2(600);

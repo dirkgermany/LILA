@@ -25,22 +25,36 @@ create or replace PACKAGE BODY LILA AS
     -- Monitoring
     ---------------------------------------------------------------
     TYPE t_monitor_rec IS RECORD (
-        process_id number(19,0),
-        action_name varchar2(25),
-        steps_done PLS_INTEGER,
-        max_steps PLS_INTEGER,
-        avg_action_duration number      
+        process_id      NUMBER(19,0),
+        action_name     VARCHAR2(25),
+        steps_done      PLS_INTEGER,
+        max_steps       PLS_INTEGER,
+        avg_action_time NUMBER,        -- Umbenannt
+        action_time     TIMESTAMP,     -- Startzeitpunkt der Aktion
+        used_time       NUMBER,        -- Dauer der letzten Ausführung (in Sek.)
+        entry_count     PLS_INTEGER := 0, -- Hilfsvariable für Durchschnittsberechnung
+        is_flushed      PLS_INTEGER := 0
     );
    
-    TYPE t_monitor_tab IS TABLE OF t_monitor_rec;
-    g_monitorList t_monitor_tab := null;
-
-    TYPE t_idx_monitor IS TABLE OF PLS_INTEGER INDEX BY VARCHAR2(100);
-    v_indexSession_monitor t_idx_monitor;
-   
-    g_max_monitor_size CONSTANT PLS_INTEGER := 1000; -- Limit
-    g_monitor_ptr      PLS_INTEGER := 0;             -- Aktueller Schreib-Zeiger    
-
+    -- Eine Nested Table, die nur die Historie EINER Aktion hält
+    TYPE t_action_history_tab IS TABLE OF t_monitor_rec;
+    
+    TYPE t_cache_num IS TABLE OF NUMBER INDEX BY VARCHAR2(100);
+    TYPE t_cache_ts  IS TABLE OF TIMESTAMP INDEX BY VARCHAR2(100);
+    TYPE t_cache_int IS TABLE OF PLS_INTEGER INDEX BY VARCHAR2(100);
+    
+    v_cache_avg   t_cache_num; -- Speichert den aktuellen avg_action_time
+    v_cache_last  t_cache_ts;  -- Speichert den letzten action_time
+    v_cache_count t_cache_int; -- Speichert die Anzahl (entry_count)
+    
+    -- Das Haupt-Objekt: Ein assoziatives Array, das für jede 
+    -- Kombi (Key) eine eigene Historie-Tabelle speichert.
+    TYPE t_monitor_map IS TABLE OF t_action_history_tab INDEX BY VARCHAR2(100);
+    g_monitor_groups t_monitor_map;
+    
+    g_max_entries_per_action CONSTANT PLS_INTEGER := 1000; -- Max. Anzahl Einträge für eine Aktion je Action
+    g_unsaved_count PLS_INTEGER := 0; -- Zähler für die Monitoreinträge im Speicher
+    g_flush_threshold CONSTANT PLS_INTEGER := 500; -- Max. Anzahl Monitoreinträge für das Flush
     ---------------------------------------------------------------
     -- Placeholders for tables
     ---------------------------------------------------------------
@@ -95,7 +109,7 @@ create or replace PACKAGE BODY LILA AS
     function replaceNameDetailTable(p_sqlStatement varchar2, p_placeHolder varchar2, p_tableName varchar2) return varchar2
     as
     begin
-        return replace(p_sqlStatement, p_placeHolder, p_tableName || '_DETAIL');
+        return replace(p_sqlStatement, p_placeHolder, p_tableName || SUFFIX_DETAIL_NAME);
     end;
     
 	------------------------------------------------------------------------------------------------
@@ -141,16 +155,20 @@ create or replace PACKAGE BODY LILA AS
             -- Details table
             sqlStmt := '
             create table PH_DETAIL_TABLE (
-                process_id number(19,0),
-                no number(19,0),
-                info clob,
-                log_level varchar2(10),
-                session_time timestamp  DEFAULT SYSTIMESTAMP,
-                session_user varchar2(50),
-                host_name varchar2(50),
-                err_stack clob,
-                err_backtrace clob,
-                err_callstack clob
+                "PROCESS_ID"        number(19,0),
+                "NO"                number(19,0),
+                "INFO"              clob,
+                "LOG_LEVEL"         varchar2(10),
+                "SESSION_TIME"      timestamp  DEFAULT SYSTIMESTAMP,
+                "SESSION_USER"      varchar2(50),
+                "HOST_NAME"         varchar2(50),
+                "ERR_STACK"         clob,
+                "ERR_BACKTRACE"     clob,
+                "ERR_CALLSTACK"     clob,
+                "MONITORING"        NUMBER(1,0) DEFAULT 0,
+                "MON_ACTION"        VARCHAR2(100),
+                "MON_USED_TIME"     NUMBER(19,0), -- Millis als Zahl für einfache Auswertung
+                "MON_STEPS_DONE"    NUMBER(19,0)
             )';
             sqlStmt := replaceNameDetailTable(sqlStmt, PARAM_DETAIL_TABLE, p_TabNameMaster);
             run_sql(sqlStmt);
@@ -175,10 +193,8 @@ create or replace PACKAGE BODY LILA AS
 
     exception      
         when others then
-        dbms_output.enable();
-        dbms_output.put_line('Fehler...');
-        dbms_output.put_line(sqlerrm);
-        dbms_output.put_line(sqlStmt);
+            -- creating log files mustn't fail
+            RAISE;
      end;
      
 	------------------------------------------------------------------------------------------------
@@ -232,6 +248,9 @@ create or replace PACKAGE BODY LILA AS
 	    when others then
 	        if t_rc%isopen then close t_rc; end if;
 	        rollback; -- Auch im Fehlerfall die Transaktion beenden
+            if v_indexSession.EXISTS(p_processId) and logLevelDebug <= g_sessionList(v_indexSession(p_processId)).log_level then
+                RAISE;
+            end if;
 	end;
 
 	------------------------------------------------------------------------------------------------
@@ -265,73 +284,119 @@ create or replace PACKAGE BODY LILA AS
         
     exception
         when others then
-        return null;
+            if v_indexSession.EXISTS(p_processId) and logLevelDebug <= g_sessionList(v_indexSession(p_processId)).log_level then
+                RAISE;
+            else
+                return null;
+            end if;
     end;
 
 
     /*
         Methods dedicated to the g_monitorList
     */
+    
+    ------------------------------------------------------------------------------------------------
+    -- Flush monitor data to detail table
+    ------------------------------------------------------------------------------------------------
+    procedure flushMonitor(p_processId number)
+    as
+        v_sessionRec  t_session_rec;
+        v_targetTable varchar2(150);
+        v_key         varchar2(100);
+        
+        -- Flache Listen für das FORALL
+        v_ids         sys.odcinumberlist   := sys.odcinumberlist();
+        v_actions     sys.odcivarchar2list := sys.odcivarchar2list();
+        v_steps       sys.odcinumberlist   := sys.odcinumberlist();
+        v_used        sys.odcinumberlist   := sys.odcinumberlist();
+        v_times       sys.odcidatelist     := sys.odcidatelist();
+    begin
+        v_sessionRec := getSessionRecord(p_processId);
+        if v_sessionRec.tabName_master is null then return; end if;
+        v_targetTable := v_sessionRec.tabName_master || '_DETAIL';
+    
+        -- 1. Daten sammeln
+        v_key := g_monitor_groups.FIRST;
+        while v_key is not null loop
+            -- Prüfen, ob die Gruppe zum Prozess gehört
+            if g_monitor_groups(v_key).COUNT > 0 
+               and g_monitor_groups(v_key)(1).process_id = p_processId then
+                
+                -- Historie durchlaufen und nur ungeflushte Einträge nehmen
+                for i in 1 .. g_monitor_groups(v_key).COUNT loop
+                    if g_monitor_groups(v_key)(i).is_flushed = 0 then
+                        v_ids.extend;     v_ids(v_ids.last)     := g_monitor_groups(v_key)(i).process_id;
+                        v_actions.extend; v_actions(v_actions.last) := g_monitor_groups(v_key)(i).action_name;
+                        v_steps.extend;   v_steps(v_steps.last)   := g_monitor_groups(v_key)(i).steps_done;
+                        v_used.extend;    v_used(v_used.last)    := g_monitor_groups(v_key)(i).used_time;
+                        v_times.extend;   v_times(v_times.last)   := cast(g_monitor_groups(v_key)(i).action_time as date);
+                    end if;
+                end loop;
+            end if;
+            v_key := g_monitor_groups.NEXT(v_key);
+        end loop;
+    
+        -- 2. Dynamischer Bulk-Insert (nur wenn neue Daten da sind)
+        if v_ids.COUNT > 0 then
+            execute immediate 
+                'forall i in 1 .. :1
+                    insert into ' || v_targetTable || ' 
+                    (PROCESS_ID, MON_ACTION, MON_STEPS_DONE, MON_USED_TIME, SESSION_TIME, MONITORING)
+                    values (:2(i), :3(i), :4(i), :5(i), :6(i), 1)'
+                using v_ids.COUNT, v_ids, v_actions, v_steps, v_used, v_times;
+    
+            -- 3. Markieren als geflusht (nach Erfolg!)
+            v_key := g_monitor_groups.FIRST;
+            while v_key is not null loop
+                if g_monitor_groups(v_key).COUNT > 0 
+                   and g_monitor_groups(v_key)(1).process_id = p_processId then
+                    for i in 1 .. g_monitor_groups(v_key).COUNT loop
+                        g_monitor_groups(v_key)(i).is_flushed := 1;
+                    end loop;
+                end if;
+                v_key := g_monitor_groups.NEXT(v_key);
+            end loop;
+        end if;
+    end;
+    
     ------------------------------------------------------------------------------------------------
     -- Hilfsfunktion (intern): Erzeugt den einheitlichen Key für den Index
     ------------------------------------------------------------------------------------------------
     function buildMonitorKey(p_processId number, p_actionName varchar2) return varchar2
     is
     begin
+        -- Ein Key repräsentiert eine Gruppe von Einträgen (die Historie dieser Aktion)
         return to_char(p_processId) || '_' || p_actionName;
     end;
 
     ------------------------------------------------------------------------------------------------
     -- Delivers a record of the monitor list by process_id and action_name
     ------------------------------------------------------------------------------------------------
-    function getMonitorRecord(p_processId number, p_actionName varchar2) return t_monitor_rec
-    as
-        v_key     varchar2(100);
-        listIndex number;
+    function get_ms_diff(p_start timestamp, p_end timestamp) return number is
+        v_diff interval day to second;
     begin
-        v_key := buildMonitorKey(p_processId, p_actionName);
-        
-        if not v_indexSession_monitor.EXISTS(v_key) THEN
-            -- Datentyp RECORD kann nicht auf IS NULL geprüft werden, 
-            -- daher wird ein initialisierter Record geliefert (Felder sind NULL).
-            return null; 
-        end if;
-
-        listIndex := v_indexSession_monitor(v_key);
-        return g_monitorList(listIndex);
+        v_diff := p_end - p_start;
+        -- Umwandlung in Millisekunden: 
+        -- (Tage*86400 + Std*3600 + Min*60 + Sek) * 1000 + Millisekunden
+        return (extract(day from v_diff) * 86400
+              + extract(hour from v_diff) * 3600
+              + extract(minute from v_diff) * 60
+              + extract(second from v_diff)) * 1000;
     end;
-
+    
     ------------------------------------------------------------------------------------------------
-    -- Update a stored record in the monitor list
+    -- Performance Ermittlung zu einer Action
     ------------------------------------------------------------------------------------------------
-    procedure updateMonitorRecord(p_monitorRecord t_monitor_rec)
-    as
-        v_key     varchar2(100);
-        listIndex number;
+    function getCurrentAvgTime(p_processId number, p_actionName varchar2) return number
+    is
+        v_key constant varchar2(100) := to_char(p_processId) || '_' || p_actionName;
     begin
-        v_key := buildMonitorKey(p_monitorRecord.process_id, p_monitorRecord.action_name);
-        
-        if v_indexSession_monitor.EXISTS(v_key) then
-            listIndex := v_indexSession_monitor(v_key);
-            g_monitorList(listIndex) := p_monitorRecord;
+        -- Direkter Zugriff auf den flachen Cache
+        if v_cache_avg.EXISTS(v_key) then
+            return v_cache_avg(v_key);
         end if;
-    end;
-
-    ------------------------------------------------------------------------------------------------
-    -- Removes a record from the monitor list
-    ------------------------------------------------------------------------------------------------
-    procedure removeMonitor(p_processId number, p_actionName varchar2)
-    as
-        v_key     varchar2(100);
-        v_old_idx PLS_INTEGER;
-    begin
-        v_key := buildMonitorKey(p_processId, p_actionName);
-        
-        if v_indexSession_monitor.EXISTS(v_key) then        
-            v_old_idx := v_indexSession_monitor(v_key);            
-            g_monitorList.DELETE(v_old_idx);            
-            v_indexSession_monitor.DELETE(v_key);     
-        end if;       
+        return 0;
     end;
 
     ------------------------------------------------------------------------------------------------
@@ -340,54 +405,95 @@ create or replace PACKAGE BODY LILA AS
     procedure insertMonitor (
         p_processId   number, 
         p_actionName  varchar2, 
-        p_stepsDone   number, 
-        p_maxSteps    number,
-        p_avgDuration number
+        p_steps_done  number, 
+        p_max_steps   number
     )
     as
-        v_new_idx PLS_INTEGER;
-        v_key     varchar2(100);
-        v_old_key varchar2(100);
+        v_key        constant varchar2(100) := to_char(p_processId) || '_' || p_actionName;
+        v_now        constant timestamp := systimestamp;
+        v_used_time  number := 0;
+        v_new_avg    number := 0;
+        v_new_count  pls_integer := 1;
+        v_history    t_action_history_tab;
+        v_new_rec    t_monitor_rec;
     begin
-        v_key := buildMonitorKey(p_processId, p_actionName);
-
-        if g_monitorList is null then
-            g_monitorList := t_monitor_tab(); 
-        end if;
-
-        -- 1. Prüfen: Existiert dieser spezifische Monitor bereits?
-        if v_indexSession_monitor.EXISTS(v_key) then
-            v_new_idx := v_indexSession_monitor(v_key);
+        -- 1. Schnelle Berechnung über Cache (kein Array-Zugriff!)
+        if v_cache_last.EXISTS(v_key) then
+            -- Jetzt in Millisekunden
+            v_used_time := get_ms_diff(v_cache_last(v_key), v_now); 
+            v_new_count := v_cache_count(v_key) + 1;
+                    -- Gleitender Durchschnitt: ((alt * count) + neu) / (count + 1)
+            v_new_avg   := ((v_cache_avg(v_key) * v_cache_count(v_key)) + v_used_time) / v_new_count;
         else
-            -- 2. Wenn NEU: Haben wir das Limit erreicht?
-            if g_monitorList.COUNT < g_max_monitor_size then
-                -- Liste wächst noch bis zum Limit
-                g_monitorList.extend;
-                v_new_idx := g_monitorList.last;
-                g_monitor_ptr := v_new_idx; -- Zeiger wandert mit
-            else
-                -- LIMIT ERREICHT: Round-Robin Logik
-                -- Zeiger auf die nächste Position setzen (1 bis g_max_monitor_size)
-                g_monitor_ptr := mod(g_monitor_ptr, g_max_monitor_size) + 1;
-                v_new_idx := g_monitor_ptr;
-
-                -- WICHTIG: Den alten Index-Eintrag entfernen, der auf diese Stelle zeigte!
-                -- Wir müssen herausfinden, welcher Key vorher an dieser Stelle im Array saß
-                v_old_key := buildMonitorKey(g_monitorList(v_new_idx).process_id, 
-                                            g_monitorList(v_new_idx).action_name);
-                v_indexSession_monitor.DELETE(v_old_key);
-            end if;
+            v_used_time := null; -- Erster Eintrag
+            v_new_avg   := 0;
+            v_new_count := 1;
         end if;
+    
+        -- 2. Caches sofort aktualisieren (für den nächsten Aufruf)
+        v_cache_last(v_key)  := v_now;
+        v_cache_avg(v_key)   := v_new_avg;
+        v_cache_count(v_key) := v_new_count;
+    
+        -- 3. Historie-Management (nur wenn Logging aktiv ist)
+        if not g_monitor_groups.EXISTS(v_key) then
+            g_monitor_groups(v_key) := t_action_history_tab();
+        end if;
+    
+        -- Wir arbeiten direkt mit der Referenz in der Map (ab Oracle 12c+ effizient)
+        if g_monitor_groups(v_key).COUNT >= g_max_entries_per_action then
+            g_monitor_groups(v_key).DELETE(g_monitor_groups(v_key).FIRST);
+        end if;
+    
+        -- Neuen Record füllen
+        v_new_rec.process_id      := p_processId;
+        v_new_rec.action_name     := p_actionName;
+        v_new_rec.steps_done      := p_steps_done;
+        v_new_rec.max_steps       := p_max_steps;
+        v_new_rec.action_time     := v_now;
+        v_new_rec.used_time       := v_used_time;
+        v_new_rec.avg_action_time := v_new_avg;
+        v_new_rec.entry_count     := v_new_count;
+    
+        g_monitor_groups(v_key).EXTEND;
+        g_monitor_groups(v_key)(g_monitor_groups(v_key).LAST) := v_new_rec;
+        
+        -- 3. NEU: Schwellenwert-Logik am Ende
+        g_unsaved_count := g_unsaved_count + 1;
+    
+        if g_unsaved_count >= g_flush_threshold then
+            flushMonitor(p_processId);
+            g_unsaved_count := 0; -- Zähler erst nach erfolgreichem Flush zurücksetzen
+        end if;
+        
+    exception
+        when others then       -- Nur Raisen, wenn wir im Debug-Modus sind UND die Session kennen
+            if p_processId is not null 
+               and v_indexSession.EXISTS(p_processId) 
+               and g_sessionList(v_indexSession(p_processId)).log_level >= logLevelDebug 
+            then
+                RAISE;
+            end if;
+            -- Im Produktionsmodus: Fehler verschlucken, Hauptprozess darf nicht sterben.
 
-        -- 3. Daten an der ermittelten Position (v_new_idx) schreiben
-        g_monitorList(v_new_idx).process_id          := p_processId;
-        g_monitorList(v_new_idx).action_name         := p_actionName;
-        g_monitorList(v_new_idx).steps_done          := p_stepsDone;
-        g_monitorList(v_new_idx).max_steps           := p_maxSteps;
-        g_monitorList(v_new_idx).avg_action_duration := p_avgDuration;
+    end;
 
-        -- 4. Neuen Index-Eintrag setzen
-        v_indexSession_monitor(v_key) := v_new_idx;
+    ------------------------------------------------------------------------------------------------
+    -- Removing a record from monitor list
+    ------------------------------------------------------------------------------------------------
+    procedure removeMonitor(p_processId number, p_actionName varchar2)
+    as
+        v_key constant varchar2(100) := buildMonitorKey(p_processId, p_actionName);
+    begin
+        -- 1. Historie löschen
+        if g_monitor_groups.EXISTS(v_key) then
+            g_monitor_groups.DELETE(v_key);
+        end if;
+        
+        -- 2. ALLE Caches löschen (Neu!)
+        v_cache_avg.DELETE(v_key);
+        v_cache_last.DELETE(v_key);
+        v_cache_count.DELETE(v_key);
     end;
 
 
@@ -515,6 +621,9 @@ create or replace PACKAGE BODY LILA AS
 	exception
 	    when others then
 	        rollback; -- Auch im Fehlerfall die Transaktion beenden
+            if v_indexSession.EXISTS(p_processId) and logLevelDebug <= g_sessionList(v_indexSession(p_processId)).log_level then
+                RAISE;
+            end if;
     end;
 
 	------------------------------------------------------------------------------------------------
@@ -543,6 +652,9 @@ create or replace PACKAGE BODY LILA AS
 	exception
 	    when others then
 	        rollback; -- Auch im Fehlerfall die Transaktion beenden
+            if v_indexSession.EXISTS(p_processId) and logLevelDebug <= g_sessionList(v_indexSession(p_processId)).log_level then
+                RAISE;
+            end if;
     end;
 
 	------------------------------------------------------------------------------------------------
@@ -566,6 +678,9 @@ create or replace PACKAGE BODY LILA AS
 	exception
 	    when others then
 	        rollback; -- Auch im Fehlerfall die Transaktion beenden
+            if v_indexSession.EXISTS(p_processId) and logLevelDebug <= g_sessionList(v_indexSession(p_processId)).log_level then
+                RAISE;
+            end if;
     end;
  
 	------------------------------------------------------------------------------------------------
@@ -590,6 +705,9 @@ create or replace PACKAGE BODY LILA AS
 	exception
 	    when others then
 	        rollback; -- Auch im Fehlerfall die Transaktion beenden
+            if v_indexSession.EXISTS(p_processId) and logLevelDebug <= g_sessionList(v_indexSession(p_processId)).log_level then
+                RAISE;
+            end if;
     end;
 
 	------------------------------------------------------------------------------------------------
@@ -619,6 +737,9 @@ create or replace PACKAGE BODY LILA AS
 	exception
 	    when others then
 	        rollback; -- Auch im Fehlerfall die Transaktion beenden
+            if v_indexSession.EXISTS(p_processId) and logLevelDebug <= g_sessionList(v_indexSession(p_processId)).log_level then
+                RAISE;
+            end if;
     end;
 
 	------------------------------------------------------------------------------------------------
@@ -640,6 +761,9 @@ create or replace PACKAGE BODY LILA AS
 	exception
 	    when others then
 	        rollback; -- Auch im Fehlerfall die Transaktion beenden
+            if v_indexSession.EXISTS(p_processId) and logLevelDebug <= g_sessionList(v_indexSession(p_processId)).log_level then
+                RAISE;
+            end if;
     end;
 
 	------------------------------------------------------------------------------------------------
@@ -661,6 +785,9 @@ create or replace PACKAGE BODY LILA AS
 	exception
 	    when others then
 	        rollback; -- Auch im Fehlerfall die Transaktion beenden
+            if v_indexSession.EXISTS(p_processId) and logLevelDebug <= g_sessionList(v_indexSession(p_processId)).log_level then
+                RAISE;
+            end if;
     end;
 
 	------------------------------------------------------------------------------------------------
@@ -724,6 +851,9 @@ create or replace PACKAGE BODY LILA AS
             END IF;
             sqlCursor := null;
 			rollback;
+            if v_indexSession.EXISTS(p_processId) and logLevelDebug <= g_sessionList(v_indexSession(p_processId)).log_level then
+                RAISE;
+            end if;
     end;
 
 	------------------------------------------------------------------------------------------------
@@ -763,6 +893,9 @@ create or replace PACKAGE BODY LILA AS
 	exception
 	    when others then
 	        rollback; -- Auch im Fehlerfall die Transaktion beenden
+            if v_indexSession.EXISTS(p_processId) and logLevelDebug <= g_sessionList(v_indexSession(p_processId)).log_level then
+                RAISE;
+            end if;
     end;
 
 	------------------------------------------------------------------------------------------------
@@ -1024,14 +1157,17 @@ create or replace PACKAGE BODY LILA AS
     as
         v_idx PLS_INTEGER;
    begin
-        if v_indexSession.EXISTS(p_processId) and logLevelSilent <= g_sessionList(v_indexSession(p_processId)).log_level then
-            v_idx := v_indexSession(p_processId);
-            g_sessionList(v_idx).counter_details := p_stepsDone;        
-            write_close_session(p_processId,  g_sessionList(v_idx).tabName_master, p_stepsToDo, p_stepsDone, p_processInfo, p_status);
-            
-            -- Eintrag aus internem Speicher entfernen
-            g_sessionList.delete(v_indexSession(p_processId));
-            v_indexSession.delete(p_processId); -- Auch den Index-Eintrag entfernen!
+        if v_indexSession.EXISTS(p_processId) then
+            flushMonitor(p_processId);
+            if  logLevelSilent <= g_sessionList(v_indexSession(p_processId)).log_level then
+                v_idx := v_indexSession(p_processId);
+                g_sessionList(v_idx).counter_details := p_stepsDone;        
+                write_close_session(p_processId,  g_sessionList(v_idx).tabName_master, p_stepsToDo, p_stepsDone, p_processInfo, p_status);
+                
+                -- Eintrag aus internem Speicher entfernen
+                g_sessionList.delete(v_indexSession(p_processId));
+                v_indexSession.delete(p_processId); -- Auch den Index-Eintrag entfernen!
+            end if;
         end if;
     end;
 

@@ -131,8 +131,8 @@ logLevelDebug   constant number := 8;
 
 | Name               | Type      | Description                         | Scope
 | ------------------ | --------- | ----------------------------------- | -------
-| [`NEW_SESSION`](#function-new_session) | Function  | Opens a new log session | Log Session
-| [`CLOSE_SESSION`](#procedure-close_session) | Procedure | Ends a log session | Log Session
+| [`NEW_SESSION`](#function-new_session) | Function  | Opens a new log session; **Mandatory** | Log Session
+| [`CLOSE_SESSION`](#procedure-close_session) | Procedure | Ends a log session; **Mandatory** | Log Session
 | [`SET_PROCESS_STATUS`](#procedure-set_process_status) | Procedure | Sets the state of the log status | Log Session
 | [`SET_STEPS_TODO`](#procedure-set_steps_todo) | Procedure | Sets the required number of actions | Log Session
 | [`SET_STEPS_DONE`](#procedure-set_steps_todo) | Procedure | Sets the number of completed actions | Log Session

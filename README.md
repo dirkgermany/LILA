@@ -21,6 +21,7 @@ LILA is developed by a developer who hates over-engineered tools. Focus: 5 minut
 ## Content
 - [Key features](#key-features)
 - [Fast integration](#fast-integration)
+- [Advantages](#advantages)
 - [Logging](#logging)
   - [How to log](#how-to-log)
 - [Monitoring](#monitoring)
@@ -36,6 +37,7 @@ LILA is developed by a developer who hates over-engineered tools. Focus: 5 minut
 7. **Future Ready**: Built for the latest Oracle 26ai (2026), and fully tested with existing 19c environment
 8. **Small Footprint**:  ~1k lines of logical PL/SQL code ensures simple quality and security control, fast compilation, zero bloat and minimal Shared Pool utilization (reducing memory pressure and fragmentation)
 
+---
 ## Fast integration
 * Setting up LILA means creating a package by copy&paste (refer [documentation file "setup.md"](docs/setup.md))
 * Only a few API calls are necessary for the complete logging of a process (refer [documentation file "API.md"](docs/API.md))
@@ -44,7 +46,47 @@ LILA is developed by a developer who hates over-engineered tools. Focus: 5 minut
 >LILA comes ready to test right out of the box, so no custom implementation or coding is required to see the framework in action immediately after setup.
 >Also please have a look to the sample applications 'learn_lila': https://github.com/dirkgermany/LILA-Logging/tree/main/demo/first_steps.
 
-### Demo
+---
+## Advantages
+The following points complement the **Key Features** and provide a deeper insight into the architectural decisions and technical innovations of LILA.
+
+### Technology
+#### Autonomous Persistence
+LILA strictly utilizes `PRAGMA AUTONOMOUS_TRANSACTION`. This guarantees that log entries and monitoring data are permanently stored in the database, even if the calling main transaction performs a `ROLLBACK` due to an error. This ensures the root cause remains available for post-mortem analysis.
+
+#### Deep Context Insights
+By leveraging the `UTL_CALL_STACK`, LILA automatically captures the exact program execution path. Instead of just logging a generic error, it documents the entire call chain, significantly accelerating the debugging process in complex, nested PL/SQL environments.
+
+#### High-Performance Buffering
+To minimize the impact on the main application’s overhead, LILA features an internal buffering system. Log writing is processed efficiently, offering a decisive performance advantage over simple, row-by-row logging methods, especially in high-load production environments.
+
+#### Built-in Extensibility (Adapters)
+LILA's decoupled architecture is designed for seamless integration with modern monitoring stacks. Its structured data format allows for the easy creation of adapters:
+*   **Oracle APEX:** Use native SQL queries to power APEX Charts and Dashboards for real-time application monitoring.
+*   **Grafana:** Connect LILA via **ORDS (Oracle REST Data Services)** to visualize performance trends and system health in Grafana dashboards.
+*   **Custom Adapters:** The relational core can be extended for any REST-based or SQL-based reporting tool without modifying the core logging engine.
+
+### Observability & AI Readiness
+
+#### Real-Time Performance Metrics
+LILA is more than just a logging tool. Through the `MARK_STEP` functionality, specific checkpoints can be integrated into the code. The framework provides out-of-the-box metrics such as:
+*   **Step Duration:** Precise execution time for specific process segments.
+*   **Average Duration:** Historical benchmarks to identify performance degradation over time.
+*   **Step Counter:** Monitoring the number of iterations or progress within a workflow.
+
+#### Intelligent Metric Calculation
+Instead of performing expensive aggregations across millions of log records for every query, LILA uses an intelligent calculation mechanism. Metrics are updated incrementally, ensuring that monitoring dashboards (e.g., in Grafana, APEX, or Oracle Jet) remain highly responsive even with massive datasets.
+
+### Core Strengths
+
+#### Scalability & Cloud Readiness
+By avoiding file system dependencies (`UTL_FILE`) and focusing on native database features, LILA is 100% compatible with **Oracle Autonomous Database** and optimized for scalable cloud infrastructures in 2026.
+
+#### Developer Experience (DX)
+LILA promotes a standardized error-handling and monitoring culture within development teams. Its easy-to-use API allows for a "zero-config" start, enabling developers to implement professional observability in
+
+---
+## Demo
 Execute the following statement in the SQL editor (optionally activate dbms-output for your session beforehand):
 ```sql
 exec lila.is_alive;
@@ -53,7 +95,6 @@ select * from lila_log;
 If you have activated dbms output, you will receive an additional message there.
 
 ---
-
 ## Logging
 LILA persists different information about your processes.
 For simplicity, all logs are stored in two tables.
@@ -116,12 +157,13 @@ end MY_DEMO_PROC;
 
 ```
 ---
-
 ## Monitoring
 Monitor your processes according to your requirements:
 * Real-time Progress: Query the master table for a single-row snapshot of any running process (steps_todo, steps_done, status, timestamps).
 * Deep Dive (Details): Query the detail table for the full chronological history and error stack of a process.
 * API Access: Use the built-in getter functions to retrieve status and progress directly within your PL/SQL logic or UI components.
+
+For comprehensive information, refer to [documentation file "monitoring.md"](docs/monitoring.md).
 
 ### How to monitor
 Three options:

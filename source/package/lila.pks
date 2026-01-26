@@ -18,6 +18,7 @@ create or replace PACKAGE LILA AS
     TYPE t_process_rec IS RECORD (
         id              NUMBER(19,0),
         process_name    varchar2(100),
+        log_level       PLS_INTEGER,
         process_start   TIMESTAMP,
         process_end     TIMESTAMP,
         last_update     TIMESTAMP,
@@ -88,6 +89,4 @@ create or replace PACKAGE LILA AS
     ----------
     -- Check if LILA works
     PROCEDURE IS_ALIVE;
-
-
 END LILA;

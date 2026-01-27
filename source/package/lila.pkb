@@ -2068,22 +2068,17 @@ dbms_output.put_line('okay');
     --------------------------------------------------------------------------
     
     FUNCTION GET_LATEST_CONFIG(p_timeout_sec IN NUMBER DEFAULT 5) RETURN CLOB IS
-        l_report    CLOB;
-        l_line      VARCHAR2(120) := RPAD('-', 100, '-') || CHR(10);
-        l_sql       VARCHAR2(2000);
-        l_cursor    SYS_REFCURSOR;
-    
-        -- Variablen für die Spalten
-        v_id        NUMBER;
-        v_name      VARCHAR2(100);
-        v_start     TIMESTAMP;
-        v_is_act    NUMBER;
-        v_lvl       NUMBER;
-        v_f_log     NUMBER;
-        v_f_proc    NUMBER;
-        v_f_mon     NUMBER;
-        v_m_factor  NUMBER;
-        v_m_max     NUMBER;
+    l_report    CLOB;
+    l_line      VARCHAR2(120) := RPAD('-', 100, '-') || CHR(10);
+    l_sql       VARCHAR2(2000);
+    l_cursor    SYS_REFCURSOR;
+
+    -- Variablen für die Spalten
+    v_f_log     NUMBER;
+    v_f_proc    NUMBER;
+    v_f_mon     NUMBER;
+    v_m_factor  NUMBER;
+    v_m_max     NUMBER;
     BEGIN
         -- B. Header für den Report
         l_report := l_line || ' LATEST ACTIVE CONFIGURATION REPORT' || CHR(10) || l_line;
@@ -2098,8 +2093,7 @@ dbms_output.put_line('okay');
         end case;
 
         -- C. Daten abfragen (Jüngster Datensatz mit IS_ACTIVE = 1)
-        l_sql := 'SELECT process_id, process_name, process_start, is_active, log_level, ' ||
-                 '       flush_log_threshold, flush_process_threshold, flush_monitor_threshold, ' ||
+        l_sql := 'SELECT flush_log_threshold, flush_process_threshold, flush_monitor_threshold, ' ||
                  '       monitor_alert_threshold_factor, max_entries_per_monitor_action ' ||
                  'FROM ' || CONFIG_TABLE || ' ' ||
                  'WHERE is_active = 1 ' ||
@@ -2108,15 +2102,11 @@ dbms_output.put_line('okay');
     
         BEGIN
             OPEN l_cursor FOR l_sql;
-            FETCH l_cursor INTO v_id, v_name, v_start, v_is_act, v_lvl, 
-                                v_f_log, v_f_proc, v_f_mon, v_m_factor, v_m_max;
+            FETCH l_cursor INTO v_f_log, v_f_proc, v_f_mon, v_m_factor, v_m_max;
             
-            IF l_cursor%FOUND THEN
+             IF l_cursor%FOUND THEN
+                -- Hier wurden alle alten Variablen (ID, Name, Start, IS_ACTIVE, LogLevel) entfernt
                 l_report := l_report || 
-                    'Process Info:  ' || v_name || ' (ID: ' || v_id || ') Started: ' || TO_CHAR(v_start, 'DD.MM.YYYY HH24:MI:SS') || CHR(10) ||
-                    l_line ||
-                    RPAD('IS_ACTIVE', 35) || ': ' || v_is_act || CHR(10) ||
-                    RPAD('LOG_LEVEL', 35) || ': ' || v_lvl || CHR(10) ||
                     RPAD('FLUSH_LOG_THRESHOLD', 35) || ': ' || v_f_log || CHR(10) ||
                     RPAD('FLUSH_PROCESS_THRESHOLD', 35) || ': ' || v_f_proc || CHR(10) ||
                     RPAD('FLUSH_MONITOR_THRESHOLD', 35) || ': ' || v_f_mon || CHR(10) ||
@@ -2176,34 +2166,34 @@ dbms_output.put_line('okay');
                     l_line;
                                    
         
-            -- Dynamisches SQL zusammenbauen
-            -- Wir nutzen CONFIG_TABLE (deine Variable/Konstante für den Namen)
-            l_sql := ' SELECT process_id, process_name, process_start, log_level, steps_todo, steps_done ' ||
-                     ' FROM ' || CONFIG_TABLE ||
-                     ' WHERE is_active = 1
-                       ORDER BY process_name, process_start DESC';
+        -- Dynamisches SQL zusammenbauen
+        -- Wir nutzen CONFIG_TABLE (deine Variable/Konstante für den Namen)
+        l_sql := ' SELECT process_id, process_name, process_start, log_level, steps_todo, steps_done ' ||
+                 ' FROM ' || CONFIG_TABLE ||
+                 ' WHERE is_active = 1
+                   ORDER BY process_name, process_start DESC';
 
-            BEGIN
-                OPEN l_cursor FOR l_sql;
-                LOOP
-                    FETCH l_cursor INTO v_id, v_name, v_start, v_lvl, v_todo, v_done;
-                    EXIT WHEN l_cursor%NOTFOUND;
-        
-                    l_report := l_report || 
-                        RPAD(NVL(TO_CHAR(v_id), ' '), 12) || ' | ' ||
-                        RPAD(NVL(SUBSTR(v_name, 1, 20), ' '), 20) || ' | ' ||
-                        RPAD(NVL(TO_CHAR(v_start, 'DD.MM.YY HH24:MI'), ' '), 20) || ' | ' ||
-                        RPAD(NVL(TO_CHAR(v_lvl), ' '), 4) || ' | ' ||
-                        RPAD(NVL(TO_CHAR(v_todo), ' '), 8) || ' | ' ||
-                        RPAD(NVL(TO_CHAR(v_done), ' '), 8) || CHR(10);
-                END LOOP;
-                CLOSE l_cursor;
-                
-            EXCEPTION
-                WHEN OTHERS THEN
-                    l_report := l_report || 'ERROR: Table ' || CONFIG_TABLE || ' could not be read.' || CHR(10);
-                    IF l_cursor%ISOPEN THEN CLOSE l_cursor; END IF;
-            END;
+        BEGIN
+            OPEN l_cursor FOR l_sql;
+            LOOP
+                FETCH l_cursor INTO v_id, v_name, v_start, v_lvl, v_todo, v_done;
+                EXIT WHEN l_cursor%NOTFOUND;
+    
+                l_report := l_report || 
+                    RPAD(NVL(TO_CHAR(v_id), ' '), 12) || ' | ' ||
+                    RPAD(NVL(SUBSTR(v_name, 1, 20), ' '), 20) || ' | ' ||
+                    RPAD(NVL(TO_CHAR(v_start, 'DD.MM.YY HH24:MI'), ' '), 20) || ' | ' ||
+                    RPAD(NVL(TO_CHAR(v_lvl), ' '), 4) || ' | ' ||
+                    RPAD(NVL(TO_CHAR(v_todo), ' '), 8) || ' | ' ||
+                    RPAD(NVL(TO_CHAR(v_done), ' '), 8) || CHR(10);
+            END LOOP;
+            CLOSE l_cursor;
+            
+        EXCEPTION
+            WHEN OTHERS THEN
+                l_report := l_report || 'ERROR: Table ' || CONFIG_TABLE || ' could not be read.' || CHR(10);
+                IF l_cursor%ISOPEN THEN CLOSE l_cursor; END IF;
+        END;
 
         
         l_report := l_report || l_line;        

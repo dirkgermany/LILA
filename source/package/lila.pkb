@@ -161,36 +161,53 @@ create or replace PACKAGE BODY LILA AS
     procedure refreshConfiguration(p_processId number);
     procedure refreshSession(p_configRec t_config_rec);
     
+    
+    --------------------------------------------------------------------------
+    -- Calc Timestamp as key for requests 
+	--------------------------------------------------------------------------
+    function getRequestKey return varchar2
+    as
+    begin
+ 
+    return 'LILA->' || TO_CHAR(
+        (EXTRACT(DAY FROM (sys_extract_utc(SYSTIMESTAMP) - TO_TIMESTAMP('1970-01-01', 'YYYY-MM-DD'))) * 86400000) + 
+        TO_NUMBER(TO_CHAR(sys_extract_utc(SYSTIMESTAMP), 'SSSSSFF3')),
+        'FM999999999999999'
+    );
+    end;
+    
     --------------------------------------------------------------------------
     -- Avoid throttling 
 	--------------------------------------------------------------------------
     function waitForResponse(
-        p_clientId      in number,
         p_serverChannel IN varchar2, -- Der Kanal, auf dem der Server hört (LILA_REQUEST)
-        p_clientChannel IN varchar2, -- Der Kanal, auf dem der Client auf Antwort wartet (ANY_MSG)
-        p_request       in varchar2,
+        p_request       in varchar2, -- Wird für die Zuordnung/Verzweigung im Server benötigt
         p_payload       IN varchar2, 
         p_timeoutSec    IN number
     ) return varchar2
     as
         PRAGMA AUTONOMOUS_TRANSACTION;
+        
         l_msg       VARCHAR2(1800);
         l_status    PLS_INTEGER;
-        l_token     varchar2(50);
+        l_clientChannel  varchar2(50);
         l_header    varchar2(100);
         l_meta      varchar2(100);
         l_data      varchar2(1500);
     begin
-        l_token := p_clientChannel || '->' || trim(to_char(p_clientId));
+        l_clientChannel := getRequestKey;
         
-        l_header := '"header":{"request":"' || p_request || '", "response":"' || l_token ||'"}';
-        l_meta  := '"meta":{"clientId":' || p_clientId || '}';
-        l_data  := '"payload":{' || p_payLoad || '"}';
+        l_header := '"header":{"request":"' || p_request || '", "response":"' || l_clientChannel ||'"}';
+        l_meta  := '"meta":{"param":"value"}';
+        l_data  := '"payload":{' || p_payLoad || '}';
         
-        l_msg := '{ ' || l_header || ', ' || l_meta || l_data || ' }';
+        l_msg := '{' || l_header || ', ' || l_meta || ', ' || l_data || '}';
+        
+dbms_output.enable();
+dbms_output.put_line(l_msg);
     
         -- 1. Zuerst registrieren, damit wir die Antwort nicht verpassen!
-        DBMS_ALERT.REGISTER(l_token);
+        DBMS_ALERT.REGISTER(l_clientChannel);
     
         -- 2. Jetzt dem Server das Signal schicken
         -- Wir schicken z.B. '<ANY_MSG>Daten'
@@ -198,9 +215,9 @@ create or replace PACKAGE BODY LILA AS
         COMMIT; -- Signal für Server sichtbar machen
     
         -- 3. Auf Antwort vom Server auf dem Client-Kanal warten
-        DBMS_ALERT.WAITONE(l_token, l_msg, l_status, p_timeoutSec);
+        DBMS_ALERT.WAITONE(l_clientChannel, l_msg, l_status, p_timeoutSec);
         
-        DBMS_ALERT.REMOVE(l_token);
+        DBMS_ALERT.REMOVE(l_clientChannel);
         COMMIT; 
         
         IF l_status = 1 THEN RETURN 'TIMEOUT'; END IF;
@@ -2123,14 +2140,13 @@ dbms_output.put_line('okay');
         -- B. Header für den Report
         l_report := l_line || ' LATEST ACTIVE CONFIGURATION REPORT' || CHR(10) || l_line;
         
-                p_clientId      in number,
-        p_serverChannel IN varchar2, -- Der Kanal, auf dem der Server hört (LILA_REQUEST)
-        p_clientChannel IN varchar2, -- Der Kanal, auf dem der Client auf Antwort wartet (ANY_MSG)
-        p_request       in varchar2,
-        p_payload       IN varchar2, 
-        p_timeoutSec    IN number
+        l_response := waitForResponse(
+            p_serverChannel => 'LILA_REQUEST', -- Der Kanal, auf dem der Server hört (LILA_REQUEST)
+            p_request       => 'GET_LATEST_CONFIG',
+            p_payload       => '{"info":"REQUEST_FROM_' || USER || '"}',
+            p_timeoutSec   => 5
+        );
 
-        l_response := waitForResponse(g_clientId, 'LILA_REQUEST', 'LILA_RESPONSE_CONFIG', 'REQUEST_FROM_' || USER, p_timeout_sec);
         CASE
             WHEN l_response = 'TIMEOUT' THEN
                 l_report := l_report || '-- Warnung: Instanz antwortet nicht (Timeout). Zeige alten Tabellenstand.' || CHR(10);
@@ -2198,7 +2214,7 @@ dbms_output.put_line('okay');
     BEGIN
         l_report := l_line || ' LATEST ACTIVE CONFIGURATION REPORT' || CHR(10) || l_line;
         
-        case waitForSignal('LILA_REQUEST', 'LILA_DATA_PERSISTED', 'REQUEST_FROM_' || USER, p_timeout_sec)
+        case waitForSignal('LILA_REQUEST', 'LILA_PERSISTED', 'REQUEST_FROM_' || USER, p_timeout_sec)
             when 0 THEN
                 l_report := l_report || '-- Status: Daten frisch von Instanz erhalten.' || CHR(10);
             when 1 then
@@ -2254,23 +2270,41 @@ dbms_output.put_line('okay');
    
 	--------------------------------------------------------------------------
     
-    function extractClientId(l_message varchar2, l_json_doc varchar2) return PLS_INTEGER
+    function extractClientChannel(l_json_doc varchar2) return varchar2
     as
-        l_clientId PLS_INTEGER;
+        l_clientChannel varchar2(30);
     begin
-        SELECT j.clientId
+        SELECT j.clientChannel
         INTO
-            l_clientId
-
+            l_clientChannel
         FROM JSON_TABLE(l_json_doc, '$'
             COLUMNS (
-                clientId number  PATH '$.CLIENT_ID'
+                clientChannel varchar(30)  PATH '$.header.response'
             )
         ) j;
         
-        return l_clientId;
+        return l_clientChannel;
 
     end;        
+    
+    --------------------------------------------------------------------------
+    
+    function extractClientRequest(l_json_doc varchar2) return varchar2
+    as
+        l_clientRequest varchar2(30);
+    begin
+        SELECT j.clientRequest
+        INTO
+            l_clientRequest
+        FROM JSON_TABLE(l_json_doc, '$'
+            COLUMNS (
+                clientRequest varchar(30)  PATH '$.header.request'
+            )
+        ) j;
+        
+        return l_clientRequest;
+
+    end;
     
 	--------------------------------------------------------------------------
     
@@ -2298,12 +2332,12 @@ dbms_output.put_line('okay');
         ) j;
         
         l_processId := NEW_SESSION(l_session_init);
-        DBMS_ALERT.SIGNAL('LILA_RESPONSE_NEW_SESSION->' || l_clientId, '{"PROCESS_ID" : ' || l_processId || '}');
+        DBMS_ALERT.SIGNAL('LILA_NEW_SESSION->' || l_clientId, '{"PROCESS_ID" : ' || l_processId || '}');
         COMMIT; -- Wichtig: Signal und Daten werden sichtbar
 
-    end;
-
-	--------------------------------------------------------------------------
+    end;    
+    
+	--------------------------------------------------------------------------   
     
     procedure SERVER_SEND_ANY_MSG(p_message varchar2)
     as
@@ -2311,26 +2345,23 @@ dbms_output.put_line('okay');
     begin
         dbms_output.enable();
         l_response := waitForResponse(
-            p_clientId      => g_clientId,
             p_serverChannel => 'LILA_REQUEST',
-            p_clientChannel => 'LILA_RESPONSE_ANY_MSG',
-            p_payload       => '<ANY_MSG>' || p_message,
-            p_timeoutSec    => 5
+            p_request       => 'ANY_MSG',
+            p_payload       => p_message,
+            p_timeoutSec    => 2
         );
 
+        dbms_output.put_line(l_response);
         
         l_response := waitForResponse(
             p_serverChannel => 'LILA_REQUEST',
-            p_clientChannel => 'LILA_RESPONSE_ANY_MSG',
-            p_payload       => '<EXIT>' || p_message,
-            p_timeoutSec    => 5
+            p_request       => 'EXIT',
+            p_payload       => p_message,
+            p_timeoutSec    => 2
         );
                 
         dbms_output.put_line(l_response);
     end;
-    
-	--------------------------------------------------------------------------   
-    
     
 	--------------------------------------------------------------------------    
     
@@ -2343,14 +2374,14 @@ dbms_output.put_line('okay');
         l_json_doc  VARCHAR2(2000);
     begin
     
-        l_request := '<NEW_SESSION>';
+--        l_request := '<NEW_SESSION>';
         l_request := l_request || '{"CLIENT_ID" : ' || g_clientId;
         l_request := l_request || ', "PROCESS_NAME" : "' || p_session_init.processName || '"';
         l_request := l_request || ', "LOG_LEVEL" : ' || p_session_init.logLevel;
         l_request := l_request || ', "STEPS_TODO" : ' || p_session_init.stepsToDo;
         l_request := l_request || ', "TABNAME_MASTER" : "' || p_session_init.tabNameMaster || '"}';
         
-        l_response := waitForResponse(g_clientId, 'LILA_REQUEST', 'LILA_RESPONSE_NEW_SESSION', l_request, 5);
+        l_response := waitForResponse(g_clientId, 'LILA_NEW_SESSION', l_request, 5);
         CASE
             WHEN l_response = 'TIMEOUT' THEN
                 l_ProcessId := -110;
@@ -2387,13 +2418,11 @@ dbms_output.put_line('okay');
     
     PROCEDURE START_SERVER
     as
-        l_clientId  PLS_INTEGER;
+        l_clientChannel  varchar2(30);
         l_message   VARCHAR2(1800);
         l_status    INTEGER;
-        l_timeout   NUMBER := 600; -- Timeout nach 10 Minuten Warten
-        l_pos_start INTEGER;
-        l_pos_end   INTEGER;
-        l_tag       VARCHAR2(100);
+        l_timeout   NUMBER := 30; --600; -- Timeout nach 10 Minuten Warten
+        l_command       VARCHAR2(100);
         l_json_doc  VARCHAR2(2000);
         
     begin
@@ -2405,42 +2434,27 @@ dbms_output.put_line('okay');
             DBMS_ALERT.WAITONE('LILA_REQUEST', l_message, l_status, l_timeout);
     
             IF l_status = 0 THEN                
-                -- 1. Positionen der Klammern finden
-                l_pos_start := INSTR(l_message, '<');
-                l_pos_end   := INSTR(l_message, '>');
-            
-                IF l_pos_start > 0 AND l_pos_end > l_pos_start THEN
-                    l_tag := SUBSTR(l_message, l_pos_start + 1, l_pos_end - l_pos_start - 1);
-            
-                    -- 3. Das JSON extrahieren (Alles nach dem '>')
-                    
-                    -- Ausgabe zur Kontrolle
-                    DBMS_OUTPUT.PUT_LINE('Tag:  ' || l_tag);
-                    DBMS_OUTPUT.PUT_LINE('JSON: ' || l_json_doc);
-                ELSE
-                    -- Fehlerbehandlung: Keine gültigen Klammern gefunden
-                    l_tag := 'INVALID_FORMAT';
-                    l_json_doc := l_message;
-                END IF;
+--                l_json_doc := SUBSTR(l_message, l_pos_end + 1);
+                l_clientChannel := extractClientChannel(l_message);
+                l_command := extractClientRequest(l_message);
                 
-                l_json_doc := SUBSTR(l_message, l_pos_end + 1);
-                l_clientId := extractClientId(l_message, l_json_doc);
-                
-                CASE l_tag
+                CASE l_command
                     WHEN 'EXIT' then
-                        DBMS_ALERT.SIGNAL('LILA_RESPONSE_ANY_MSG->' || trim(to_char(l_clientId)), 'Bla');
-                        COMMIT; -- Wichtig: Signal und Daten werden sichtbar
-                        exit;
+                        dbms_output.enable();
+                        dbms_output.put_line('Exit ist eingetroffen');
+--                        DBMS_ALERT.SIGNAL(l_clientChannel, 'Bla');
+--                        COMMIT; -- Wichtig: Signal und Daten werden sichtbar
+--                        exit;
                         
                     WHEN 'ANY_MSG' then
                         dbms_output.enable();
                         dbms_output.put_line('logisch');
-                        DBMS_ALERT.SIGNAL('LILA_RESPONSE_ANY_MSG->' || trim(to_char(l_clientId)), 'Bla');
-                        COMMIT; -- Wichtig: Signal und Daten werden sichtbar
+--                        DBMS_ALERT.SIGNAL(l_clientChannel, 'Bla');
+--                        COMMIT; -- Wichtig: Signal und Daten werden sichtbar
                         
                         
                     WHEN 'NEW_SESSION' THEN
-                        serverProcessReq_newSession(l_clientId, l_message, l_json_doc);
+                        serverProcessReq_newSession(l_clientChannel, l_message, l_json_doc);
                                         
                     WHEN 'FLUSH_CONF'  THEN 
                         -- Konfigurations-Logik
@@ -2461,11 +2475,11 @@ dbms_output.put_line('okay');
                 -- Anderer Fehler
                 DBMS_OUTPUT.PUT_LINE('Fehler beim Warten: ' || l_status);
             END IF;
-    
+exit;    
         END LOOP;
     
         -- Dieser Teil wird nie erreicht, solange die DB-Session aktiv ist
-        DBMS_ALERT.REMOVE('LILA_REQUEST_PERSIST');
+        DBMS_ALERT.REMOVEALL;
     EXCEPTION
         WHEN OTHERS THEN
             DBMS_OUTPUT.PUT_LINE('Kritischer Fehler in der Daemon-Schleife: ' || SQLERRM);

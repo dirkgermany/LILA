@@ -1,3 +1,27 @@
+## Einstieg in die KI
+Ich habe für oracle pl/sql ein Framework für das Logging und Monitoring von PL/SQL Anwendungen entwickelt: LILA (LILA Integrated Logging Architecture) - github.com/dirkgermany/LILA-Logging/README.md, nicht zu verwechseln mit einem ähnlich klingenden Framework, das für die Entwicklung verwendet wird.
+
+Es gibt keine Konfigurationsdateien bzw. Tabellen.
+Bis auf einige wenige notwendige Grants läuft LILA OOTB.
+Das Logging und das Monitoring schreiben in zwei Tabellen: 'Master' mit dem Zustand je Log-Session, 'Detail' mit Logs und Monitor-Markern.
+Default-Name der Master ist 'LILA_LOG'. Die Detail Tabelle verwendet immer den Namen der Master || '_DETAIL'. Also heißt die Default-Detail Tabelle LILA_LOG_DETAIL.
+Jede Log-Session kann bei Bedarf eigene Tabellen verwenden.
+
+Je Log-Session existiert exakt ein Eintrag in der Master-Tabelle. Die IDs der Log-Sessions werden durch eine Sequence vergeben. Das ist die Referenz-ID, die in der Detail-Tabelle und bei Aufrufen der API verwendet wird.
+
+LILA funktioniert in zwei alternativen Betriebsmodi:
+'standalone', das heißt, man ruft die Methoden der API auf und nach der entspr. Bearbeitung kann die aufrufende Anwendung ihre Arbeit fortsetzen. Durch diverse Optimierungen (buffered sessions, buffered logs, buffered monitor-entries) wird die aufrufende Anwendung so gut wie nicht gebremst.
+
+Gleichzeitig kann LILA als Server gestartet werden. Dann werden die Kommandos der API per Signal aufgerufen und - ja nach Befehl - per Alert auf eine Antwort gewartet oder auch nicht.
+Das gesamte Handling der Kommunikation mit dem Server läuft innerhalb der API, d.h. die Aufrufe der Remote-API stellt sich genauso dar, wie die für die Standalone-API
+
+LILA arbeitet mit autonomen Transaktionen (silent mode).
+So ist sichergestellt, dass die Anwendung stabil läuft.
+Die Buffered-Mechanismen arbeiten auf Basis von Mengen-Thresholds und Zeit-Thresholds.
+
+Damit sich LILA als ein einziges Tool für die unterschiedlichsten Szenarien präsentiert, ist der gesamte Code in einem Paket (.pks + .pkb).
+
+
 ## Flushs auslagern in den Server-Loop
 
 ## Adaptive Timeouts: 

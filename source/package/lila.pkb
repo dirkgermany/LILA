@@ -138,6 +138,8 @@ create or replace PACKAGE BODY LILA AS
     procedure sync_log(p_processId number, p_force boolean default false);
     procedure sync_monitor(p_processId number, p_force boolean default false);
     procedure sync_process(p_processId number, p_force boolean default false);
+    function extractFromJsonStr(p_json_doc varchar2, jsonPath varchar2) return varchar2;
+    function extractFromJsonNum(p_json_doc varchar2, jsonPath varchar2) return number;
     
     ---------------------------------------------------------------
     -- Antwort Codes stabil vereinheitlichen
@@ -191,7 +193,7 @@ create or replace PACKAGE BODY LILA AS
         p_timeoutSec    IN PLS_INTEGER
     ) return varchar2
     as
-        l_msg       VARCHAR2(1800);
+        l_msg       VARCHAR2(4000);
         l_status    PLS_INTEGER;
         l_statusReceive PLS_INTEGER;
         l_clientChannel  varchar2(50);
@@ -1503,14 +1505,44 @@ create or replace PACKAGE BODY LILA AS
 
 	--------------------------------------------------------------------------
     
-    procedure log_anyRemote(
-        p_processId number, 
-        p_level number,
-        p_logText varchar2,
-        p_errStack varchar2,
-        p_errBacktrace varchar2,
-        p_errCallstack varchar2
-    )
+    procedure close_sessionRemote(p_processId number, p_stepsToDo number, p_stepsDone number, p_processInfo varchar2, p_status PLS_INTEGER)
+    as
+        l_payload varchar2(32767); -- Puffer für den JSON-String
+        l_serverMsg varchar2(100);
+        l_response PLS_INTEGER;
+    begin
+        -- Erzeugung des JSON-Objekts
+        select json_object(
+            'process_id'   value p_processId,
+            'steps_todo'   value p_stepsToDo,
+            'steps_done'   value p_stepsDone,
+            'process_info' value p_processInfo,
+            'status'       value p_status
+            returning varchar2
+        )
+        into l_payload from dual;
+        
+        l_response := waitForResponse('CLOSE_SESSION', l_payload, 1);
+        
+        if l_response in ('TIMEOUT', 'THROTTLED') or
+           l_response like 'ERROR%' then
+           l_serverMsg := 'close_sessionRemote: ' || l_response;
+        else
+            l_serverMsg := extractFromJsonStr(l_response, 'payload.server_message');
+        end if;
+            dbms_output.put_line('close_sessionRemote: ' || l_serverMsg);
+        
+                
+    EXCEPTION
+        WHEN OTHERS THEN
+            if should_raise_error(p_processId) then
+                raise;
+            end if;
+    end;
+
+	--------------------------------------------------------------------------
+    
+    procedure log_anyRemote(p_processId number, p_level number, p_logText varchar2, p_errStack varchar2, p_errBacktrace varchar2, p_errCallstack varchar2)
     as
         l_payload varchar2(32767); -- Puffer für den JSON-String
     begin
@@ -1534,7 +1566,6 @@ create or replace PACKAGE BODY LILA AS
             end if;
 
     end;
-
     
 	--------------------------------------------------------------------------
 
@@ -1854,6 +1885,13 @@ create or replace PACKAGE BODY LILA AS
     as
         v_idx PLS_INTEGER;
     begin
+        if is_remote(p_processId) then
+            close_sessionRemote(p_processId, p_stepsToDo, p_stepsDone, p_processInfo, p_status);
+            g_remote_sessions.delete(p_processId);
+            return;
+        end if;
+
+        -- Hier nur weiter, wenn lokale processId
         if v_indexSession.EXISTS(p_processId) then
             SYNC_ALL_DIRTY(true);
 
@@ -1997,7 +2035,7 @@ create or replace PACKAGE BODY LILA AS
     end;
     
 	--------------------------------------------------------------------------
-    
+        
     procedure doRemote_logAny(p_message varchar2)
     as
         l_processId number;
@@ -2018,6 +2056,43 @@ create or replace PACKAGE BODY LILA AS
         
         log_any(l_processId, l_level, l_logText, l_errStack, l_errBacktrace, l_errCallstack);
     end;
+
+	-------------------------------------------------------------------------- 
+    
+    procedure doRemote_closeSession(p_clientChannel varchar2, p_message VARCHAR2)
+    as
+        l_processId   number; 
+        l_stepsToDo   PLS_INTEGER; 
+        l_stepsDone   PLS_INTEGER; 
+        l_processInfo varchar2(1000);
+        l_status      PLS_INTEGER;
+        l_payload varchar2(1600);
+        l_header    varchar2(100);
+        l_meta      varchar2(100);
+        l_data      varchar2(1500);
+        l_msg       VARCHAR2(4000);
+    begin
+        l_payload     := JSON_QUERY(p_message, '$.payload');
+        l_processId   := extractFromJsonStr(l_payload, 'process_id');
+        l_stepsToDo   := extractFromJsonStr(l_payload, 'steps_todo');
+        l_stepsDone   := extractFromJsonNum(l_payload, 'steps_done');
+        l_processInfo := extractFromJsonNum(l_payload, 'process_info');
+        l_status      := extractFromJsonNum(l_payload, 'status');
+        
+
+        l_header := '"header":{"msg_type":"SERVER_RESPONSE"}';
+        l_meta   := '"meta":{"server_version":"' || LILA_VERSION || '"}';
+        l_data   := '"payload":{"server_message":"' || TXT_ACK_OK || '", ' || get_serverCode(TXT_ACK_OK);
+        l_msg := '{' || l_header || ', ' || l_meta || ', ' || l_data || '}';
+
+        CLOSE_SESSION(l_processId, l_stepsToDo, l_stepsDone, l_processInfo, l_status);
+        DBMS_PIPE.RESET_BUFFER; -- Koffer leeren
+        DBMS_PIPE.PACK_MESSAGE('{"process_id":' || l_processId || '}');        
+        l_status := DBMS_PIPE.SEND_MESSAGE(p_clientChannel, timeout => 1);
+
+    end;    
+
+	-------------------------------------------------------------------------- 
     
     procedure doRemote_newSession(p_clientChannel varchar2, p_message VARCHAR2)
     as
@@ -2041,12 +2116,13 @@ create or replace PACKAGE BODY LILA AS
     end;    
     
 	-------------------------------------------------------------------------- 
-    procedure SERVER_SEND_EXIT(p_message varchar2)
+    
+    procedure SERVER_SHUTDOWN(p_message varchar2)
     as
         l_response varchar2(1000);
     begin
         l_response := waitForResponse(
-            p_request       => 'EXIT',
+            p_request       => 'SERVER_SHUTDOWN',
             p_payload       => p_message,
             p_timeoutSec    => 5
         );
@@ -2133,17 +2209,15 @@ create or replace PACKAGE BODY LILA AS
     --------------------------------------------------------------------------
     function packServerResp(p_serverMsgTxt varchar2) return varchar2
     as
-        l_serverCodeNum PLS_INTEGER;
         l_header varchar2(100);
         l_meta   varchar2(100);
         l_data   varchar2(100);
         l_msg    varchar2(500);
     begin
     
-        l_serverCodeNum := get_serverCode(p_serverMsgTxt);
-        l_header := '"header":{"msg_type":"SERVER_RESPONSE", "server_version":"' || LILA_VERSION || '"}';
-        l_meta   := '"meta":{"param":"value"}';
-        l_data   := '"payload":{"server_message":"' || TXT_ACK_SHUTDOWN || '", ' || l_serverCodeNum;
+        l_header := '"header":{"msg_type":"SERVER_RESPONSE"}';
+        l_meta   := '"meta":{"server_version":"' || LILA_VERSION || '"}';
+        l_data   := '"payload":{"server_message":"' || TXT_ACK_SHUTDOWN || '", ' || get_serverCode(p_serverMsgTxt);
         
         l_msg := '{' || l_header || ', ' || l_meta || ', ' || l_data || '}';
 
@@ -2152,14 +2226,14 @@ create or replace PACKAGE BODY LILA AS
     
 	--------------------------------------------------------------------------
     
-    PROCEDURE handleServerExit(p_clientChannel varchar2, p_serverMsgNum varchar2)
+    PROCEDURE handleServerShutdown(p_clientChannel varchar2, p_serverMsgNum varchar2)
     as
         l_status    PLS_INTEGER;
     begin
         DBMS_PIPE.PACK_MESSAGE(packServerResp(p_serverMsgNum));
         l_status := DBMS_PIPE.SEND_MESSAGE(p_clientChannel, timeout => 2);
         dbms_output.enable();
-        dbms_output.put_line('Exit Signal gesetzt, antworte an ' || p_clientChannel);
+        dbms_output.put_line('Shutdown Signal gesetzt, antworte an ' || p_clientChannel);
         
         IF l_status = 0 THEN
             dbms_output.put_line('Antwort an Client gesendet.');
@@ -2180,11 +2254,12 @@ create or replace PACKAGE BODY LILA AS
         l_request   VARCHAR2(100);
         l_json_doc  VARCHAR2(2000);        
         l_dummyRes PLS_INTEGER;
-        l_exitSignal BOOLEAN := FALSE;
+        l_shutdownSignal BOOLEAN := FALSE;
         l_stop_server_exception EXCEPTION;
     begin
         g_serverProcessId := new_session('LILA_REMOTE_SERVER', logLevelWarn);
         -- Pipe erstellen (Public oder Private, Kapazität hier 1MB für High-Load)
+        g_remote_sessions.DELETE;
         DBMS_PIPE.PURGE(g_pipeName); 
         l_dummyRes := DBMS_PIPE.REMOVE_PIPE(g_pipeName);
         l_dummyRes := DBMS_PIPE.CREATE_PIPE(pipename => g_pipeName, maxpipesize => 1048576, private => false);
@@ -2199,15 +2274,18 @@ create or replace PACKAGE BODY LILA AS
                 l_request := extractClientRequest(l_message);
                                 
                 CASE l_request
-                    WHEN 'EXIT' then
-                        handleServerExit(l_clientChannel, TXT_ACK_SHUTDOWN); 
-                        l_exitSignal := TRUE;
+                    WHEN 'SERVER_SHUTDOWN' then
+                        handleServerShutdown(l_clientChannel, TXT_ACK_SHUTDOWN); 
+                        l_shutdownSignal := TRUE;
 
                     WHEN 'ANY_MSG' then
                         null;
                         
                     WHEN 'NEW_SESSION' THEN
                         doRemote_newSession(l_clientChannel, l_message);
+                        
+                    WHEN 'CLOSE_SESSION' THEN
+                        doRemote_closeSession(l_clientChannel, l_message);
 
                     WHEN 'LOG_ANY' then
                         doRemote_logAny(l_message);
@@ -2235,7 +2313,7 @@ create or replace PACKAGE BODY LILA AS
                 SYNC_ALL_DIRTY;
             end if;
             
-            EXIT when l_exitSignal;
+            EXIT when l_shutdownSignal;
         END LOOP;
         
         DBMS_OUTPUT.ENABLE();
@@ -2243,6 +2321,7 @@ create or replace PACKAGE BODY LILA AS
         -- es könnten noch dirty buffered Einträge existieren
         sync_all_dirty(true);
         DBMS_PIPE.PURGE(g_pipeName); 
+        g_remote_sessions.DELETE;
 
         v_key := TO_CHAR(g_serverProcessId);        
         IF g_log_groups.EXISTS(v_key) THEN

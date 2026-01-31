@@ -1325,25 +1325,6 @@ DBMS_OUTPUT.PUT_LINE('!!! FORCE DELETE VERSUCH FUER: ' || v_key);
 
 	--------------------------------------------------------------------------
 
-    -- removes a record from the internal process list
-    procedure removeSession(p_processId number)
-    as
-        listIndex number;
-        v_old_idx PLS_INTEGER;
-    begin
-        -- check if process exists
-        if v_indexSession.EXISTS(p_processId) then        
-            -- get list index
-            v_old_idx := v_indexSession(p_processId);            
-            -- delete from internal list
-            g_sessionList.DELETE(v_old_idx);            
-            -- delete index
-            v_indexSession.DELETE(p_processId);     
-        end if;       
-    end;
-
-	--------------------------------------------------------------------------
-
     -- Creating and adding a new record to the process list
     -- and persist to config table
     procedure insertSession (p_tabName varchar2, p_processId number, p_logLevel PLS_INTEGER)

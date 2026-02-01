@@ -50,25 +50,13 @@ create or replace PACKAGE BODY LILA AS
         avg_action_time NUMBER,        -- Umbenannt
         action_time     TIMESTAMP,     -- Startzeitpunkt der Aktion
         used_time       NUMBER,        -- Dauer der letzten Ausführung (in Sek.)
-        steps_done     PLS_INTEGER := 0, -- Hilfsvariable für Durchschnittsberechnung
-        is_flushed      PLS_INTEGER := 0
+        steps_done     PLS_INTEGER := 0 -- Hilfsvariable für Durchschnittsberechnung
     );
-   
-    -- Eine Nested Table, die nur die Historie EINER Aktion hält
-    TYPE t_action_history_tab IS TABLE OF t_monitor_buffer_rec;
-    
-    TYPE t_cache_num IS TABLE OF NUMBER INDEX BY VARCHAR2(100);
-    TYPE t_cache_ts  IS TABLE OF TIMESTAMP INDEX BY VARCHAR2(100);
-    TYPE t_cache_int IS TABLE OF PLS_INTEGER INDEX BY VARCHAR2(100);
-    
-    v_cache_avg   t_cache_num; -- Speichert den aktuellen avg_action_time
-    v_cache_last  t_cache_ts;  -- Speichert den letzten action_time
-    v_cache_count t_cache_int; -- Speichert die Anzahl (steps_done)
-    
-    -- Das Haupt-Objekt: Ein assoziatives Array, das für jede 
-    -- Kombi (Key) eine eigene Historie-Tabelle speichert.
-    TYPE t_monitor_map IS TABLE OF t_action_history_tab INDEX BY VARCHAR2(100);
+    TYPE t_monitor_history_tab IS TABLE OF t_monitor_buffer_rec;    
+    TYPE t_monitor_map IS TABLE OF t_monitor_history_tab INDEX BY VARCHAR2(100);
     g_monitor_groups t_monitor_map;
+    TYPE t_monitor_shadow_map IS TABLE OF t_monitor_buffer_rec INDEX BY VARCHAR2(100);
+    g_monitor_shadows t_monitor_shadow_map;
                 
     ---------------------------------------------------------------
     -- Logging
@@ -112,14 +100,8 @@ create or replace PACKAGE BODY LILA AS
     g_flush_log_threshold PLS_INTEGER               := 12500; -- Max. Anzahl Logs bis zum Flush
     g_max_entries_per_monitor_action PLS_INTEGER    := 2500;  -- Round Robin: Max. Anzahl Einträge für eine Aktion je Action
     g_flush_monitor_threshold PLS_INTEGER           := 2500;  -- Max. Anzahl Monitoreinträge für das Flush
-    g_monitor_alert_threshold_factor NUMBER         := 2.0;   -- Max. Ausreißer in der Dauer eines Verarbeitungsschrittes
-/*
-    g_flush_millis_threshold PLS_INTEGER            := 1500; 
-    g_flush_log_threshold PLS_INTEGER               := 1000;
-    g_max_entries_per_monitor_action PLS_INTEGER    := 1000; -- Round Robin: Max. Anzahl Einträge für eine Aktion je Action
-    g_flush_monitor_threshold PLS_INTEGER           := 100; -- Max. Anzahl Monitoreinträge für das Flush
-    g_monitor_alert_threshold_factor NUMBER         := 2.0; -- Max. Ausreißer in der Dauer eines Verarbeitungsschrittes
-*/   
+    g_monitor_alert_threshold_factor NUMBER         := 5.0;   -- Max. Ausreißer in der Dauer eines Verarbeitungsschrittes
+  
     -- Throttling for SIGNALs
     g_last_signal_time TIMESTAMP := SYSTIMESTAMP - INTERVAL '1' DAY;
     
@@ -140,11 +122,11 @@ create or replace PACKAGE BODY LILA AS
     function getSessionRecord(p_processId number) return t_session_rec;
     function getProcessRecord(p_processId number) return t_process_rec;
     procedure sync_log(p_processId number, p_force boolean default false);
-    procedure sync_monitor(p_processId number, p_force boolean default false, p_isShutdown boolean default false);
+    procedure sync_monitor(p_processId number, p_force boolean default false);
     procedure sync_process(p_processId number, p_force boolean default false);
     function extractFromJsonStr(p_json_doc varchar2, jsonPath varchar2) return varchar2;
     function extractFromJsonNum(p_json_doc varchar2, jsonPath varchar2) return number;
-    procedure flushMonitor(p_processId number, p_isShutdown BOOLEAN DEFAULT FALSE);
+    procedure flushMonitor(p_processId number);
     
     ---------------------------------------------------------------
     -- Antwort Codes stabil vereinheitlichen
@@ -592,7 +574,7 @@ create or replace PACKAGE BODY LILA AS
     
         -- 2. Ziel-Tabelle aus der Session-Liste ermitteln
         v_idx_session := v_indexSession(p_processId);
-        v_targetTable := g_sessionList(v_idx_session).tabName_master || '_DETAIL';
+        v_targetTable := g_sessionList(v_idx_session).tabName_master || SUFFIX_DETAIL_NAME;
     
         -- 3. Daten aus der hierarchischen Map in flache Listen sammeln
         for i in 1 .. g_log_groups(v_key).COUNT loop
@@ -669,7 +651,6 @@ create or replace PACKAGE BODY LILA AS
         g_log_groups(v_key).EXTEND;
         g_log_groups(v_key)(g_log_groups(v_key).LAST) := v_new_log;
         
-        -- In write_to_log_buffer
         g_sessionList(v_idx).log_dirty_count := nvl(g_sessionList(v_idx).log_dirty_count, 0) + 1;
         -- ID in die Dirty-Queue werfen
         g_dirty_queue(p_processId) := TRUE;
@@ -680,14 +661,12 @@ create or replace PACKAGE BODY LILA AS
     /*
         Methods dedicated to the g_monitorList
     */
-    
     --------------------------------------------------------------------------
     -- Write monitor data to detail table
     --------------------------------------------------------------------------
     procedure persist_monitor_data(
         p_processId    number,
         p_target_table varchar2,
-        p_ids          sys.odcinumberlist,
         p_actions      sys.odcivarchar2list,
         p_steps_done   sys.odcinumberlist,
         p_used         sys.odcinumberlist,
@@ -700,16 +679,16 @@ create or replace PACKAGE BODY LILA AS
         v_host varchar2(128) := SYS_CONTEXT('USERENV','HOST');
         v_safe_table varchar2(150);
     begin
-        if p_ids.count > 0 then
+        if p_actions.count > 0 then
             -- Sicherheit: Tabellenname validieren
             v_safe_table := DBMS_ASSERT.SQL_OBJECT_NAME(p_target_table);
     
-            forall i in 1 .. p_ids.count SAVE EXCEPTIONS
+            forall i in 1 .. p_actions.count SAVE EXCEPTIONS
                 execute immediate
                 'insert into ' || v_safe_table || ' 
                 (PROCESS_ID, MON_ACTION, MON_STEPS_DONE, MON_USED_MILLIS, MON_AVG_MILLIS, SESSION_TIME, MONITORING, SESSION_USER, HOST_NAME)
                 values (:1, :2, :3, :4, :5, :6, 1, :7, :8)'
-                using p_ids(i), p_actions(i), p_steps_done(i), p_used(i), p_avgs(i), p_times(i),
+                using p_processId, p_actions(i), p_steps_done(i), p_used(i), p_avgs(i), p_times(i),
                       v_user, v_host;
             
             commit;
@@ -755,7 +734,7 @@ BEGIN
 
                 -- Synchronisation (p_isShutdown wird durchgereicht)
                 sync_log(v_id, p_force);
-                sync_monitor(v_id, p_force, p_isShutdown);
+                sync_monitor(v_id, p_force);
                 sync_process(v_id, p_force);
                 
                 -- Überprüfung: Ist die Session jetzt "sauber"?
@@ -784,7 +763,7 @@ BEGIN
         WHILE v_id IS NOT NULL LOOP
             -- flushMonitor direkt aufrufen, um is_flushed=1 Einträge zu löschen.
             -- Da p_isShutdown = TRUE, greift dort g_monitor_groups.DELETE(v_key).
-            flushMonitor(v_id, p_isShutdown => TRUE);
+            flushMonitor(v_id);
             
             v_id := v_indexSession.NEXT(v_id);
         END LOOP;
@@ -792,142 +771,78 @@ BEGIN
         -- Falls am Ende wirklich ALLES weg soll (komplette Package-Variablen leeren):
         -- g_monitor_groups.DELETE;
         -- g_dirty_queue.DELETE;
-    END IF;
+        END IF;
 
-END SYNC_ALL_DIRTY;
+    END SYNC_ALL_DIRTY;
 
 
     --------------------------------------------------------------------------
     -- Write monitor data to detail table
     --------------------------------------------------------------------------
-    procedure flushMonitor(p_processId number, p_isShutdown BOOLEAN DEFAULT FALSE)
+    procedure flushMonitor(p_processId number)
     as
-        v_sessionRec  t_session_rec;
+        v_id_prefix   constant varchar2(50) := LPAD(p_processId, 20, '0') || '|';
+        v_group_key   varchar2(100);
+        v_idx_session pls_integer;
         v_targetTable varchar2(150);
-        v_key         varchar2(100);
-        v_idx         pls_integer;
-        
-        -- Präfix für gezielte Suche (LPAD sorgt für korrekte Sortierung in der Map)
-        v_search_prefix constant varchar2(30) := lpad(p_processId, 20, '0') || '|';
-        
-        -- Sammlungen für den Datentransfer
-        v_ids           sys.odcinumberlist   := sys.odcinumberlist();
-        v_actions       sys.odcivarchar2list := sys.odcivarchar2list();
-        v_steps_done    sys.odcinumberlist   := sys.odcinumberlist();
-        v_used          sys.odcinumberlist   := sys.odcinumberlist();
-        v_avgs          sys.odcinumberlist   := sys.odcinumberlist();
-        v_times         sys.odcidatelist     := sys.odcidatelist();
+        v_keep_rec    t_monitor_buffer_rec;
+    
+        v_actions     sys.odcivarchar2list := sys.odcivarchar2list();
+        v_steps_done  sys.odcinumberlist   := sys.odcinumberlist();
+        v_used        sys.odcinumberlist   := sys.odcinumberlist();
+        v_avgs        sys.odcinumberlist   := sys.odcinumberlist();
+        v_times       sys.odcidatelist     := sys.odcidatelist();
     begin
+        v_idx_session := v_indexSession(p_processId);
+        v_targetTable := g_sessionList(v_idx_session).tabName_master || SUFFIX_DETAIL_NAME;
     
-    -- DEBUG-BLOCK ANFANG
-    DBMS_OUTPUT.PUT_LINE('--- Debug flushMonitor ---');
-    DBMS_OUTPUT.PUT_LINE('Suche Prefix: "' || v_search_prefix || '"');
-    DBMS_OUTPUT.PUT_LINE('Shutdown-Modus: ' || CASE WHEN p_isShutdown THEN 'JA' ELSE 'NEIN' END);
-DBMS_OUTPUT.PUT_LINE('Anzahl Einträge in g_monitor_groups: ' || g_monitor_groups.COUNT);
-        -- Metadaten laden
-        v_sessionRec := getSessionRecord(p_processId);
-        if v_sessionRec.tabName_master is null then return; end if;
-        v_targetTable := v_sessionRec.tabName_master || '_DETAIL';
-    
-        -- SCHRITT 1: Daten aus dem Speicher sammeln
-        -- Wir starten beim ersten Key der Map
-        v_key := g_monitor_groups.FIRST;
-        
-        while v_key is not null loop
-            -- OPTIMIERUNG: Da die Map sortiert ist, können wir abbrechen, 
-            -- wenn der Key alphabetisch hinter unserem Prozess-Präfix liegt.
---            exit when v_key > v_search_prefix || 'zzzz';
-            
-            -- Nur verarbeiten, wenn der Key zu unserem Prozess gehört
-            if v_key like v_search_prefix || '%' then
-                if g_monitor_groups(v_key).COUNT > 0 then
-                    
-                    v_idx := g_monitor_groups(v_key).FIRST;
-                    while v_idx is not null loop
-                        -- Nur ungeflushte (dirty) Einträge sammeln
-                        if g_monitor_groups(v_key)(v_idx).is_flushed = 0 then
-                            v_ids.extend;        v_ids(v_ids.last)        := g_monitor_groups(v_key)(v_idx).process_id;
-                            v_actions.extend;    v_actions(v_actions.last)    := g_monitor_groups(v_key)(v_idx).action_name;
-                            v_steps_done.extend; v_steps_done(v_steps_done.last) := g_monitor_groups(v_key)(v_idx).steps_done;
-                            v_used.extend;       v_used(v_used.last)       := g_monitor_groups(v_key)(v_idx).used_time;
-                            v_avgs.extend;       v_avgs(v_avgs.last)       := g_monitor_groups(v_key)(v_idx).avg_action_time;
-                            v_times.extend;      v_times(v_times.last)      := cast(g_monitor_groups(v_key)(v_idx).action_time as date);
-                        end if;
-                        v_idx := g_monitor_groups(v_key).NEXT(v_idx);
+        v_group_key := g_monitor_groups.FIRST;
+        while v_group_key is not null loop     
+            -- Filter: Gehört dieser "Eimer" zum aktuellen Prozess?
+           if v_group_key like v_id_prefix || '%' then  
+                -- 1. Alles einsammeln, was aktuell im Eimer ist
+                    for i in 1 .. g_monitor_groups(v_group_key).COUNT loop
+                        v_actions.extend;    v_actions(v_actions.last)    := g_monitor_groups(v_group_key)(i).action_name;
+                        v_steps_done.extend; v_steps_done(v_steps_done.last) := g_monitor_groups(v_group_key)(i).steps_done;
+                        v_used.extend;       v_used(v_used.last)          := g_monitor_groups(v_group_key)(i).used_time;
+                        v_avgs.extend;       v_avgs(v_avgs.last)          := g_monitor_groups(v_group_key)(i).avg_action_time;
+                        v_times.extend;      v_times(v_times.last)         := cast(g_monitor_groups(v_group_key)(i).action_time as date);
                     end loop;
-                end if;
-            end if;
-            
-            v_key := g_monitor_groups.NEXT(v_key);
-        end loop;  
         
-        -- SCHRITT 2: Autonome Persistierung aufrufen
-        if v_ids.COUNT > 0 then
+                -- 3. Radikaler Kahlschlag im RAM (SGA/PGA Hygiene)
+                g_monitor_groups(v_group_key).DELETE;
+            end if;
+    
+            v_group_key := g_monitor_groups.NEXT(v_group_key);
+        end loop;
+    
+        -- 5. Persistieren
+        if v_actions.COUNT > 0 then
             persist_monitor_data(
                 p_processId    => p_processId,
                 p_target_table => v_targetTable,
-                p_ids          => v_ids,
                 p_actions      => v_actions,
                 p_steps_done   => v_steps_done,
                 p_used         => v_used,
                 p_avgs         => v_avgs,
                 p_times        => v_times
             );
-    
-            -- SCHRITT 3: Im Speicher als geflusht markieren
-            -- oder by shutdown löschen
-DBMS_OUTPUT.PUT_LINE(' Nach Persistierung und vor v_key := g_monitor_groups.FIRST');
-
-            v_key := g_monitor_groups.FIRST;
-        
-DBMS_OUTPUT.PUT_LINE(' Nach v_key := g_monitor_groups.FIRST und vor WHILE v_key is not null loop');
-            WHILE v_key IS NOT NULL LOOP
-                -- Optimierung: Da Keys sortiert sind, können wir abbrechen, 
-                -- wenn wir den Bereich der p_processId verlassen haben.
---                EXIT WHEN v_key > v_search_prefix || 'zzzz';
-DBMS_OUTPUT.PUT_LINE('Erster Befehl nach while v_key is not null loop');
-                
-                IF v_key LIKE v_search_prefix || '%' THEN
-                    IF p_isShutdown THEN
-DBMS_OUTPUT.PUT_LINE('!!! FORCE DELETE VERSUCH FUER: ' || v_key);
-    
-    -- Test: Sofort prüfen, ob es weg ist
-                       -- Speicher löschen
-                        g_monitor_groups.DELETE(v_key);
-                        
-    IF NOT g_monitor_groups.EXISTS(v_key) THEN
-        DBMS_OUTPUT.PUT_LINE('--- Bestätigt: Key ist aus RAM gelöscht.');
-    ELSE
-        DBMS_OUTPUT.PUT_LINE('--- FEHLER: Key existiert trotz DELETE noch!');
-    END IF;                         
-                        
-                        IF v_cache_avg.EXISTS(v_key)   THEN v_cache_avg.DELETE(v_key);   END IF;
-                        IF v_cache_last.EXISTS(v_key)  THEN v_cache_last.DELETE(v_key);  END IF;
-                        IF v_cache_count.EXISTS(v_key) THEN v_cache_count.DELETE(v_key); END IF;
-                    ELSE
-                        -- Nur Markieren
-                        FOR i IN 1 .. g_monitor_groups(v_key).COUNT LOOP
-                            g_monitor_groups(v_key)(i).is_flushed := 1;
-                        END LOOP;
-                    END IF;
-                END IF;
-        
-                v_key := g_monitor_groups.NEXT(v_key);
-            END LOOP;
+            g_sessionList(v_idx_session).monitor_dirty_count := 0;
         end if;
-        
+    
     exception
         when others then
-            if should_raise_error(p_processId) then
-                RAISE;
-            end if;
-    end;
+            if should_raise_error(p_processId) then RAISE; end if;
+    end flushMonitor;
 
 	--------------------------------------------------------------------------
 
-    procedure sync_monitor(p_processId number, p_force boolean default false, p_isShutdown boolean default false)
+    procedure sync_monitor(p_processId number, p_force boolean default false)
     as
-        v_idx PLS_INTEGER;
+
+--        v_idx PLS_INTEGER;
+        
+        v_idx varchar2(100);
         v_ms_since_flush NUMBER;
         v_now constant timestamp := systimestamp;
 
@@ -937,29 +852,31 @@ DBMS_OUTPUT.PUT_LINE('!!! FORCE DELETE VERSUCH FUER: ' || v_key);
             return;
         end if;
         v_idx := v_indexSession(p_processId);
-    
-        -- 2. Dirty-Zähler für diesen spezifischen Prozess erhöhen
-        g_sessionList(v_idx).monitor_dirty_count := nvl(g_sessionList(v_idx).monitor_dirty_count, 0) + 1;
-        g_dirty_queue(p_processId) := TRUE;
-        -- 3. Zeitdifferenz seit letztem Flush berechnen
+
         -- Falls noch nie geflusht wurde (Start), setzen wir die Differenz hoch
         if g_sessionList(v_idx).last_monitor_flush is null then
             v_ms_since_flush := g_flush_millis_threshold + 1;
         else
             v_ms_since_flush := get_ms_diff(g_sessionList(v_idx).last_monitor_flush, v_now);
         end if;
-    
         -- 4. Die "Smarte" Flush-Bedingung: Menge ODER Zeit ODER Force
         if p_force 
            or g_sessionList(v_idx).monitor_dirty_count >= g_flush_monitor_threshold 
            or v_ms_since_flush >= g_flush_millis_threshold
         then
-            flushMonitor(p_processId, p_isShutdown);
+            flushMonitor(p_processId);
             
             -- Reset der prozessspezifischen Steuerungsdaten
             g_sessionList(v_idx).monitor_dirty_count := 0;
             g_sessionList(v_idx).last_monitor_flush  := v_now;
         end if;
+                
+    exception
+        when others then
+            -- Sicherheit für das Framework: Fehler im Flush dürfen Applikation nicht stoppen
+            if should_raise_error(p_processId) then
+                raise;
+            end if;
     end;
     
     --------------------------------------------------------------------------
@@ -1078,7 +995,7 @@ DBMS_OUTPUT.PUT_LINE('!!! FORCE DELETE VERSUCH FUER: ' || v_key);
     
     --------------------------------------------------------------------------
     
-    procedure insertMonitor (p_processId number, p_actionName varchar2, p_timestamp timestamp)
+    procedure write_to_monitor_buffer (p_processId number, p_actionName varchar2, p_timestamp timestamp)
     as
         -- Key-Präfix sollte idealerweise p_processId enthalten für schnelleren Flush-Zugriff
         v_key        constant varchar2(100) := buildMonitorKey(p_processId, p_actionName);
@@ -1088,7 +1005,11 @@ DBMS_OUTPUT.PUT_LINE('!!! FORCE DELETE VERSUCH FUER: ' || v_key);
         v_new_count  PLS_INTEGER := 1;
         v_new_rec    t_monitor_buffer_rec;
         v_first_idx  PLS_INTEGER;
-        v_idx        PLS_INTEGER; 
+        
+        l_prev_idx   PLS_INTEGER;
+        l_new_idx    PLS_INTEGER;
+        v_idx        PLS_INTEGER;
+        l_prev       t_monitor_buffer_rec; 
     begin
         if is_remote(p_processId) then
             insertMonitorRemote(p_processId, p_actionName, p_timestamp);
@@ -1100,85 +1021,44 @@ DBMS_OUTPUT.PUT_LINE('!!! FORCE DELETE VERSUCH FUER: ' || v_key);
            logLevelMonitor > g_sessionList(v_indexSession(p_processId)).log_level then
             return;
         end if;
-        if p_timestamp is null then -- abhängig davon, ob der client den Zeitpunkt vorgibt
-            v_now := systimestamp;
-        else
-            v_now := p_timestamp;
-        end if;
-    
-        -- 1. Durchschnittsberechnungen (Cache-Logik)
-        if v_cache_last.EXISTS(v_key) then
-            v_used_time := get_ms_diff(v_cache_last(v_key), v_now); 
-            v_new_avg   := calculate_avg(
-                               p_old_avg    => v_cache_avg(v_key),
-                               p_curr_count => v_cache_count(v_key),
-                               p_new_value  => v_used_time
-                           );
-            v_new_count := v_cache_count(v_key) + 1;
-        else
-            v_used_time := null;
-            v_new_avg   := 0;
-            v_new_count := 1;
-        end if;
-    
-        -- 2. Caches aktualisieren
-        v_cache_last(v_key)  := v_now;
-        v_cache_avg(v_key)   := v_new_avg;
-        v_cache_count(v_key) := v_new_count;
-    
-        -- 3. Historie-Management (Buffer)
-        if not g_monitor_groups.EXISTS(v_key) then
-            g_monitor_groups(v_key) := t_action_history_tab();
-        end if;
-    
-        -- FIFO: Wenn Max-Größe erreicht, ältestes Element entfernen
-        if g_monitor_groups(v_key).COUNT >= g_max_entries_per_monitor_action then
-            v_first_idx := g_monitor_groups(v_key).FIRST;
-            
-            -- SICHERHEIT: Wenn der älteste Eintrag noch nicht gespeichert wurde, Flush erzwingen!
-            if g_monitor_groups(v_key)(v_first_idx).is_flushed = 0 then
-                flushMonitor(p_processId);
-                -- Nach dem Flush ist die Map-Position v_key evtl. gelöscht/leer (je nach Flush-Logik)
-                -- Wir stellen sicher, dass sie für den neuen Eintrag bereit ist
-                if not g_monitor_groups.EXISTS(v_key) then
-                    g_monitor_groups(v_key) := t_action_history_tab();
-                end if;
-            else
-                -- Falls er schon geflusht war, einfach nur aus dem Speicher löschen
-                g_monitor_groups(v_key).DELETE(v_first_idx);
-            end if;
-        end if;
-    
-        -- 4. Neuen Record befüllen
-        v_new_rec.process_id      := p_processId;
-        v_new_rec.action_name     := p_actionName;
-        v_new_rec.action_time     := v_now;
-        v_new_rec.used_time       := v_used_time;
-        v_new_rec.avg_action_time := v_new_avg;
-        v_new_rec.steps_done      := v_new_count;
-        v_new_rec.is_flushed      := 0; -- explizit als dirty markieren
 
-        -- 5. In Collection einfügen
+        v_now := nvl(p_timestamp, systimestamp);
+
+        IF NOT g_monitor_groups.EXISTS(v_key) THEN
+            g_monitor_groups(v_key) := t_monitor_history_tab();
+        END IF;
         g_monitor_groups(v_key).EXTEND;
-        g_monitor_groups(v_key)(g_monitor_groups(v_key).LAST) := v_new_rec;
+        l_new_idx := g_monitor_groups(v_key).LAST;
         
-        if v_indexSession.EXISTS(p_processId) then
-            v_idx := v_indexSession(p_processId);
-            
-            -- Counter erhöhen
-            g_sessionList(v_idx).monitor_dirty_count := nvl(g_sessionList(v_idx).monitor_dirty_count, 0) + 1;
-            
-            -- In die Queue eintragen (p_processId als Index reicht aus)
-            -- Falls g_dirty_queue als TABLE OF BOOLEAN definiert ist, nimm := TRUE;
-            -- Falls sie TABLE OF NUMBER ist, nimm := p_processId;
-            g_dirty_queue(p_processId) := TRUE; 
-        end if;
-                
-        -- 6. Validierung und automatische Synchronisation
-        validateDurationInAverage(p_processId, v_new_rec);
+        -- Die nächsten Werte abhängig davon ob es einen Vorgänger gibt
+        IF g_monitor_shadows.EXISTS(v_key) then            -- Es gibt einen Vorgänger
+            l_prev := g_monitor_shadows(v_key);
+            g_monitor_groups(v_key)(l_new_idx).steps_done      := l_prev.steps_done + 1;
+            g_monitor_groups(v_key)(l_new_idx).used_time       := get_ms_diff(l_prev.action_time, v_now);
+            g_monitor_groups(v_key)(l_new_idx).avg_action_time := calculate_avg(
+                                                                    l_prev.avg_action_time, 
+                                                                    g_monitor_groups(v_key)(l_new_idx).steps_done, 
+                                                                    g_monitor_groups(v_key)(l_new_idx).used_time
+                                                                  );
+        ELSE
+            -- Erster Eintrag der Session/Action
+            g_monitor_groups(v_key)(l_new_idx).steps_done      := 1;
+            g_monitor_groups(v_key)(l_new_idx).used_time       := 0; -- Erster Marker hat keine Dauer
+            g_monitor_groups(v_key)(l_new_idx).avg_action_time := 0;
+        END IF;
         
-        -- Sync entscheidet anhand von Schwellwerten (Menge/Zeit), ob flushMonitor gerufen wird
-        sync_all_dirty;
+        g_monitor_groups(v_key)(l_new_idx).process_id  := p_processId;
+        g_monitor_groups(v_key)(l_new_idx).action_name := p_actionName;
+        g_monitor_groups(v_key)(l_new_idx).action_time := v_now;
+        
+        g_monitor_shadows(v_key) := g_monitor_groups(v_key)(g_monitor_groups(v_key).LAST);         
+        
+        v_idx := v_indexSession(p_processId);
+        g_sessionList(v_idx).monitor_dirty_count := nvl(g_sessionList(v_idx).monitor_dirty_count, 0) + 1;
+        g_dirty_queue(p_processId) := TRUE; 
+        
+        validateDurationInAverage(p_processId, g_monitor_groups(v_key)(l_new_idx));
+        SYNC_ALL_DIRTY;
         
     exception
         when others then
@@ -1198,11 +1078,6 @@ DBMS_OUTPUT.PUT_LINE('!!! FORCE DELETE VERSUCH FUER: ' || v_key);
         if g_monitor_groups.EXISTS(v_key) then
             g_monitor_groups.DELETE(v_key);
         end if;
-        
-        -- 2. ALLE Caches löschen (Neu!)
-        v_cache_avg.DELETE(v_key);
-        v_cache_last.DELETE(v_key);
-        v_cache_count.DELETE(v_key);
     end;
 
     --------------------------------------------------------------------------
@@ -1259,7 +1134,7 @@ DBMS_OUTPUT.PUT_LINE('!!! FORCE DELETE VERSUCH FUER: ' || v_key);
     PROCEDURE MARK_STEP(p_processId NUMBER, p_actionName VARCHAR2, p_timestamp timestamp default NULL)
     as
     begin
-        insertMonitor (p_processId, p_actionName, p_timestamp);     
+        write_to_monitor_buffer (p_processId, p_actionName, p_timestamp);     
     end;
 
     --------------------------------------------------------------------------
@@ -1561,14 +1436,20 @@ DBMS_OUTPUT.PUT_LINE('!!! FORCE DELETE VERSUCH FUER: ' || v_key);
         v_ms_since_flush number;
     begin
         -- 1. Index der Session holen
+        if not v_indexSession.EXISTS(p_processId) then
+            return;
+        end if;
         v_idx := v_indexSession(p_processId);
-        -- 3. Zeit seit dem letzten Log-Flush berechnen
+        g_sessionList(v_idx).log_dirty_count := nvl(g_sessionList(v_idx).log_dirty_count, 0) + 1;
+        g_dirty_queue(p_processId) := TRUE;
+        
         -- (get_ms_diff ist Ihre optimierte Funktion)
         if g_sessionList(v_idx).last_log_flush is null then
             v_ms_since_flush := g_flush_millis_threshold + 1;
         else
             v_ms_since_flush := get_ms_diff(g_sessionList(v_idx).last_log_flush, v_now);
         end if;
+        
         -- 4. Flush-Bedingung: Menge ODER Zeit ODER Force
         if p_force 
            or g_sessionList(v_idx).log_dirty_count >= g_flush_log_threshold 
@@ -1940,10 +1821,6 @@ DBMS_OUTPUT.PUT_LINE('!!! FORCE DELETE VERSUCH FUER: ' || v_key);
             IF v_key LIKE v_search_prefix || '%' THEN
                 -- Historie löschen
                 g_monitor_groups.DELETE(v_key);
-                -- Caches löschen
-                IF v_cache_avg.EXISTS(v_key)   THEN v_cache_avg.DELETE(v_key);   END IF;
-                IF v_cache_last.EXISTS(v_key)  THEN v_cache_last.DELETE(v_key);  END IF;
-                IF v_cache_count.EXISTS(v_key) THEN v_cache_count.DELETE(v_key); END IF;
             END IF;
             v_key := v_next_key;
         END LOOP;
@@ -1970,6 +1847,21 @@ DBMS_OUTPUT.PUT_LINE('!!! FORCE DELETE VERSUCH FUER: ' || v_key);
         IF g_process_cache.EXISTS(p_processId) THEN
             g_process_cache.DELETE(p_processId);
         END IF;
+        
+        -- F) Monitor Shadows löschen
+            -- Wir starten am Anfang der Schatten-Map
+        v_key := g_monitor_shadows.FIRST;
+    
+        WHILE v_key IS NOT NULL LOOP
+            -- Wenn der Key zu diesem Prozess gehört, löschen wir den Eintrag
+            IF v_key LIKE v_search_prefix || '%' THEN
+                g_monitor_shadows.DELETE(v_key);
+                -- Optional: DBMS_OUTPUT.PUT_LINE('Shadow gelöscht für: ' || v_key);
+            END IF;
+            
+            -- Zum nächsten Key springen
+            v_key := g_monitor_shadows.NEXT(v_key);
+        END LOOP;
     
     EXCEPTION
         WHEN OTHERS THEN
@@ -2044,13 +1936,6 @@ DBMS_OUTPUT.PUT_LINE('!!! FORCE DELETE VERSUCH FUER: ' || v_key);
                 
                 clearAllSessionData(p_processId);
 
-/*
-                -- Eintrag aus internem Speicher entfernen
-                g_sessionList.delete(v_indexSession(p_processId));
-                v_indexSession.delete(p_processId); -- Auch den Index-Eintrag entfernen!
-                
-                g_process_cache.delete(p_processId);
-*/
 --            end if;
         end if;
     end;
@@ -2200,7 +2085,7 @@ DBMS_OUTPUT.PUT_LINE('!!! FORCE DELETE VERSUCH FUER: ' || v_key);
         l_actionName := extractFromJsonStr(l_payload, 'action_name');
         l_timestamp := extractFromJsonTime(l_payload, 'timestamp');
         
-        insertMonitor(l_processId, l_actionName, l_timestamp);
+        write_to_monitor_buffer(l_processId, l_actionName, l_timestamp);
     end;
 
 	--------------------------------------------------------------------------
@@ -2502,13 +2387,6 @@ DBMS_OUTPUT.PUT_LINE('!!! FORCE DELETE VERSUCH FUER: ' || v_key);
 
         DBMS_PIPE.PURGE(g_pipeName); 
         g_remote_sessions.DELETE;
-
-        v_key := TO_CHAR(g_serverProcessId);        
-        IF g_log_groups.EXISTS(v_key) THEN
-            DBMS_OUTPUT.PUT_LINE('Logs im Buffer für '||v_key||': '|| g_log_groups(v_key).COUNT);
-        ELSE
-            DBMS_OUTPUT.PUT_LINE('Keine Logs im Buffer für Server mit Prozess-ID: '||v_key);
-        END IF;
         
         -- abschließende Analyse der Buffer-Zustände
         DUMP_BUFFER_STATS;

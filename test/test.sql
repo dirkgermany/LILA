@@ -1,22 +1,3 @@
-drop table test_log_detail purge;
-drop table lila_log purge;
-drop table lila_log_detail purge;
-drop table local_log purge;
-drop table local_log_detail purge;
-drop table remote_log purge;
-drop table remote_log_detail purge;
-
-/*
-    In low power environments you should start ervery
-    LILA servers in a dedicated session windows.
-    This results in blocking the windows.
-
-    If your system has many cores you can
-    start the lila servers within jobs.
-*/
-exec lila.start_server('LILA_P1', 'geheim');
-exec lila.start_server('LILA_P2', 'geheim');
-
 DECLARE
     v_sessionRemote1_id VARCHAR2(100);
     v_sessionRemote2_id VARCHAR2(100);
@@ -24,13 +5,11 @@ DECLARE
     v_sessionLokal_id   VARCHAR2(100);
     v_remoteCloser_id   VARCHAR2(100);
     v_shutdownResponse  VARCHAR2(500);
-    v_lilaServer1       VARCHAR2(50);
-    v_lilaServer2       VARCHAR2(50);
+    v_startTime         TIMESTAMP;
+    v_endTime           TIMESTAMP;
 BEGIN
-    -- only use this option in strong environments
-    -- v_lilaServer1 := lila.createServer('geheim');
-    -- v_lilaServer2 := lila.createServer('geheim');
-    
+    v_startTime := systimestamp;                                                                                                                                                                                                                                                                                                                                                            
+
     -- New remote sessions
     v_sessionRemote1_id := lila.server_new_session('{"process_name":"Remote Session","log_level":8,"steps_todo":3,"days_to_keep":3,"tabname_master":"remote_log"}');
     dbms_output.put_line('Session remote: ' || v_sessionRemote1_id);
@@ -71,6 +50,18 @@ BEGIN
     dbms_output.put_line('Session remote: ' || v_remoteCloser_id);    
     lila.server_shutdown(v_remoteCloser_id, 'still not important', 'geheim');
     dbms_output.put_line('Another server closed');
+    
+
+    v_endTime := SYSTIMESTAMP;
+    
+    -- Berechnung der Millisekunden (SSSSS.FF extrahiert Sekunden seit Mitternacht inkl. Bruchteile)
+    v_diff_millis := (TO_NUMBER(TO_CHAR(v_endTime, 'SSSSS.FF3'), '99999.999', 'NLS_NUMERIC_CHARACTERS = ''. ''') - 
+                      TO_NUMBER(TO_CHAR(v_startTime, 'SSSSS.FF3'), '99999.999', 'NLS_NUMERIC_CHARACTERS = ''. ''')) * 1000;
+
+    dbms_output.put_line('---');
+    dbms_output.put_line('Intervall-Dauer: ' || (v_endTime - v_startTime));
+    dbms_output.put_line('Dauer in Millisekunden: ' || ROUND(v_diff_millis, 0) || ' ms');
+
 
 END;
 /

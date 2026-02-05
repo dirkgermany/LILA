@@ -64,6 +64,16 @@ LILA-Logging introduces a high-performance Server-Client architecture using **Or
 2. **Client Side:** Register with `lila.sever_new_session;`LILA finds the best available server.
 3. **Execution:** Log calls are serialized into the pipe, processed remotely, and stored—minimizing the impact on the client's transaction time.
 
+### Performance & Safety
+LILA prioritizes the stability of your application. It uses a Hybrid Model to balance speed and system integrity:
+* Standard: Fire-and-Forget
+* Logs, metrics, and status updates are handled via Fire-and-Forget to minimize overhead. Zero latency for your business logic.
+* Active Throttling
+* To prevent pipe flooding during load peaks, LILA rate-limits hyperactive clients until the bottleneck is cleared.
+* Fail-Safe & Self-Healing
+* LILA monitors server response times. If a server times out, LILA automatically
+  1. Switches to the next available server (Round-Robin).
+  2. Falls back to Local Logging Mode if no server is reachable. Zero data loss.
 
 ### Technology
 #### Autonomous Persistence

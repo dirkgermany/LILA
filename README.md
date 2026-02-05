@@ -27,15 +27,17 @@ LILA is developed by a developer who hates over-engineered tools. Focus: 5 minut
 - [Monitoring](#monitoring)
   - [How to monitor](#how-to-monitor)
 
+
 ## Key features
 1. **Lightweight**: One Package, two Tables, one Sequence. That's it!
 2. **Concurrent Logging**: Supports multiple, simultaneous log entries from the same or different sessions without blocking
 3. **Monitoring**: You have the option to observe your applications via SQL or via the API
-4. **Data Integrity**: Uses autonomous transactions to guarantee log persistence regardless of the main transaction's outcome
-5. **Smart Context Capture**: Automatically records ERR_STACK,  ERR_BACKTRACE, and ERR_CALLSTACK based on log level—deep insights with zero manual effort
-6. **Optional self-cleaning**: Automatically purges expired logs per application during session start—no background jobs or schedulers required
-7. **Future Ready**: Built for the latest Oracle 26ai (2026), and fully tested with existing 19c environment
-8. **Small Footprint**:  ~1k lines of logical PL/SQL code ensures simple quality and security control, fast compilation, zero bloat and minimal Shared Pool utilization (reducing memory pressure and fragmentation)
+4. **Hybrid Execution:**: Run LILA locally within your session or offload processing to a dedicated LILA-Server
+5. **Data Integrity**: Uses autonomous transactions to guarantee log persistence regardless of the main transaction's outcome
+6. **Smart Context Capture**: Automatically records ERR_STACK,  ERR_BACKTRACE, and ERR_CALLSTACK based on log level—deep insights with zero manual effort
+7. **Optional self-cleaning**: Automatically purges expired logs per application during session start—no background jobs or schedulers required
+8. **Future Ready**: Built for the latest Oracle 26ai (2026), and fully tested with existing 19c environment
+9. **Small Footprint**:  ~1k lines of logical PL/SQL code ensures simple quality and security control, fast compilation, zero bloat and minimal Shared Pool utilization (reducing memory pressure and fragmentation)
 
 ---
 ## Fast integration
@@ -49,6 +51,19 @@ LILA is developed by a developer who hates over-engineered tools. Focus: 5 minut
 ---
 ## Advantages
 The following points complement the **Key Features** and provide a deeper insight into the architectural decisions and technical innovations of LILA.
+
+### Distributed Mode & Remote Logging
+LILA-Logging introduces a high-performance Server-Client architecture using **Oracle Pipes**. This allows for asynchronous log processing and cross-session monitoring
+* **Hybrid Execution:** Run LILA locally within your session and offload processing to dedicated LILA-Servers **simultaneously**. Choose the best path for each log-level or event type in real-time
+* **Smart Load Balancing:** Clients automatically discover available servers via Round-Robin
+* **Auto-Synchronization:** Servers dynamically claim communication pipes, ensuring a zero-config setup
+* **Congestion Control (Throttling):** Optional protection layer that pauses hyperactive clients to ensure server stability during high-load peaks
+
+#### How it works
+1. **Server Side:** Start one or more LILA-Servers. They monitor pipes for incoming commands.
+2. **Client Side:** Register with `lila.sever_new_session;`LILA finds the best available server.
+3. **Execution:** Log calls are serialized into the pipe, processed remotely, and stored—minimizing the impact on the client's transaction time.
+
 
 ### Technology
 #### Autonomous Persistence

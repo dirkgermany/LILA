@@ -83,6 +83,7 @@ LILA_VERSION constant varchar2(20) := 'v1.3.0';
     FUNCTION GET_PROCESS_STATUS(p_processId NUMBER) RETURN PLS_INTEGER;
     FUNCTION GET_PROCESS_INFO(p_processId NUMBER) RETURN VARCHAR2;
     FUNCTION GET_PROCESS_DATA(p_processId NUMBER) RETURN t_process_rec;
+    FUNCTION GET_SERVER_PIPE(p_processId NUMBER) RETURN VARCHAR2;
 
     ------------------
     -- Logging details
@@ -110,7 +111,7 @@ LILA_VERSION constant varchar2(20) := 'v1.3.0';
 
     
     -- Schwellenwerte für den Schutz der SGA (besonders 23ai Free)
-    C_THROTTLE_LIMIT    CONSTANT PLS_INTEGER := 10000; -- Max Logs pro Intervall
+    C_THROTTLE_LIMIT    CONSTANT PLS_INTEGER := 1000; -- Max Logs pro Intervall
     C_THROTTLE_INTERVAL CONSTANT NUMBER      := 1000;   -- Mindestzeit in Millis für Limit
     C_THROTTLE_SLEEP    CONSTANT NUMBER      := 1.0;   -- Dauer der Atempause
 

@@ -253,14 +253,16 @@ create or replace PACKAGE BODY LILA AS
     begin
         -- 1. Cache-Check (PGA)
         IF g_client_pipes.EXISTS(p_processId) THEN
+dbms_output.put_line('getServerPipeForSession exists');
             RETURN g_client_pipes(p_processId);
         END IF;
         
         l_serverPipe := getServerPipeAvailable;
+dbms_output.put_line('getServerPipeForSession vor if l_serverPipe is null ...');
         if l_serverPipe is null then 
             RAISE_APPLICATION_ERROR(-20004, 'LILA: Kein aktiver Server gefunden.');
         end if;
-        g_client_pipes(p_processId) := getServerPipeAvailable;
+        g_client_pipes(p_processId) := l_serverPipe;
         return g_client_pipes(p_processId);
 
     end;
@@ -290,12 +292,16 @@ create or replace PACKAGE BODY LILA AS
     begin
         l_clientChannel := getClientPipe;
         
+dbms_output.enable;
+dbms_output.put_line('l_clientChannel: ' || l_clientChannel);
+        
         l_header := '"header":{"msg_type":"API_CALL", "request":"' || p_request || '", "response":"' || l_clientChannel ||'"}';
         l_meta  := '"meta":{"param":"value"}';
         l_data  := '"payload":' || p_payLoad;
         l_msgSend := '{' || l_header || ', ' || l_meta || ', ' || l_data || '}';
 
         l_serverPipe := getServerPipeForSession(p_processId);
+dbms_output.put_line('l_serverPipe: ' || l_serverPipe);
         
         DBMS_PIPE.PACK_MESSAGE(l_msgSend);
         l_status := DBMS_PIPE.SEND_MESSAGE(l_serverPipe, timeout => 3);
@@ -338,10 +344,12 @@ create or replace PACKAGE BODY LILA AS
         l_serverPipeName varchar2(50);
     begin
         l_clientChannel := getClientPipe;
+dbms_output.put_line('Zeit jetzt: ' || to_char(SYSTIMESTAMP, 'HH24:MI:SS.FF'));
         
-        l_sqlStmt := 'SELECT pipe_name FROM LILA_PIPE_REGISTRY WHERE is_active = 1 and last_seen > SYSTIMESTAMP - INTERVAL ''60'' SECOND ORDER BY current_load ASC';
+        l_sqlStmt := 'SELECT pipe_name FROM LILA_SERVER_REGISTRY WHERE is_active = 1 and last_activity > SYSTIMESTAMP - INTERVAL ''60'' HOUR ORDER BY current_load ASC';
+dbms_output.put_line('sql: ' || l_sqlStmt);
         execute immediate l_sqlStmt into l_serverPipeName;
-
+        
         return l_serverPipeName;
         
     exception

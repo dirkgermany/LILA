@@ -36,10 +36,10 @@ LILA_VERSION constant varchar2(20) := 'v1.3.0';
         process_start   TIMESTAMP,
         process_end     TIMESTAMP,
         last_update     TIMESTAMP,
-        steps_todo      PLS_INTEGER,
-        steps_done      PLS_INTEGER,
+        proc_steps_todo      PLS_INTEGER,
+        proc_steps_done      PLS_INTEGER,
         status          PLS_INTEGER,
-        info            CLOB,
+        info            VARCHAR2(4000),
         tabNameMaster   VARCHAR2(100)
     );
 
@@ -58,26 +58,26 @@ LILA_VERSION constant varchar2(20) := 'v1.3.0';
     FUNCTION NEW_SESSION(p_session_init t_session_init) RETURN NUMBER;
     FUNCTION NEW_SESSION(p_processName VARCHAR2, p_logLevel PLS_INTEGER, p_tabNameMaster VARCHAR2 default 'LILA_LOG') RETURN NUMBER;
     FUNCTION NEW_SESSION(p_processName VARCHAR2, p_logLevel PLS_INTEGER, p_daysToKeep NUMBER, p_tabNameMaster VARCHAR2 default 'LILA_LOG') RETURN NUMBER;
-    FUNCTION NEW_SESSION(p_processName VARCHAR2, p_logLevel PLS_INTEGER, p_stepsToDo NUMBER, p_daysToKeep NUMBER, p_tabNameMaster VARCHAR2 DEFAULT 'LILA_LOG') RETURN NUMBER;
+    FUNCTION NEW_SESSION(p_processName VARCHAR2, p_logLevel PLS_INTEGER, p_procStepsToDo NUMBER, p_daysToKeep NUMBER, p_tabNameMaster VARCHAR2 DEFAULT 'LILA_LOG') RETURN NUMBER;
     PROCEDURE CLOSE_SESSION(p_processId NUMBER);
     PROCEDURE CLOSE_SESSION(p_processId NUMBER, p_processInfo VARCHAR2, p_status PLS_INTEGER);
-    PROCEDURE CLOSE_SESSION(p_processId NUMBER, p_stepsDone NUMBER, p_processInfo VARCHAR2, p_status PLS_INTEGER);
-    PROCEDURE CLOSE_SESSION(p_processId NUMBER, p_stepsToDo NUMBER, p_stepsDone NUMBER, p_processInfo VARCHAR2, p_status PLS_INTEGER);
+    PROCEDURE CLOSE_SESSION(p_processId NUMBER, p_procStepsDone NUMBER, p_processInfo VARCHAR2, p_status PLS_INTEGER);
+    PROCEDURE CLOSE_SESSION(p_processId NUMBER, p_procStepsToDo NUMBER, p_procStepsDone NUMBER, p_processInfo VARCHAR2, p_status PLS_INTEGER);
 
     ---------------------------------
     -- Update the status of a process
     ---------------------------------
     PROCEDURE SET_PROCESS_STATUS(p_processId NUMBER, p_status PLS_INTEGER);
     PROCEDURE SET_PROCESS_STATUS(p_processId NUMBER, p_status PLS_INTEGER, p_processInfo VARCHAR2);
-    PROCEDURE SET_STEPS_TODO(p_processId NUMBER, p_stepsToDo NUMBER);
-    PROCEDURE SET_STEPS_DONE(p_processId NUMBER, p_stepsDone NUMBER);
-    PROCEDURE STEP_DONE(p_processId NUMBER);
+    PROCEDURE SET_PROC_STEPS_TODO(p_processId NUMBER, p_procStepsToDo NUMBER);
+    PROCEDURE SET_PROC_STEPS_DONE(p_processId NUMBER, p_procStepsDone NUMBER);
+    PROCEDURE PROC_STEP_DONE(p_processId NUMBER);
 
     -------------------------------
     -- Request process informations
     -------------------------------
-    FUNCTION GET_STEPS_DONE(p_processId NUMBER) RETURN PLS_INTEGER;
-    FUNCTION GET_STEPS_TODO(p_processId NUMBER) RETURN PLS_INTEGER;
+    FUNCTION GET_PROC_STEPS_DONE(p_processId NUMBER) RETURN PLS_INTEGER;
+    FUNCTION GET_PROC_STEPS_TODO(p_processId NUMBER) RETURN PLS_INTEGER;
     FUNCTION GET_PROCESS_START(p_processId NUMBER) RETURN TIMESTAMP;
     FUNCTION GET_PROCESS_END(p_processId NUMBER) RETURN TIMESTAMP;
     FUNCTION GET_PROCESS_STATUS(p_processId NUMBER) RETURN PLS_INTEGER;
@@ -104,6 +104,9 @@ LILA_VERSION constant varchar2(20) := 'v1.3.0';
     FUNCTION CREATE_SERVER(p_password varchar2) RETURN VARCHAR2;
     procedure START_SERVER(p_pipeName varchar2, p_password varchar2);
     FUNCTION SERVER_NEW_SESSION(p_payload varchar2) RETURN NUMBER;
+    FUNCTION SERVER_NEW_SESSION(p_processName varchar2, p_logLevel PLS_INTEGER, 
+            p_monStepsToDo PLS_INTEGER, p_daysToKeep PLS_INTEGER, p_tabNameMaster varchar2) RETURN VARCHAR2;
+
 
     procedure SERVER_SEND_ANY_MSG(p_processId number, p_message varchar2);
     procedure SERVER_SHUTDOWN(p_processId number, p_pipeName varchar2, p_password varchar2);

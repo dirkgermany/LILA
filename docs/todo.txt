@@ -2,6 +2,9 @@
 * Getter für Metriken
 * Reconnect für Client und Server
 
+## Code Optimierung
+* Generalisierung der Nachrichten durch eine Methode, die die Elemente header, meta, payload strukturiert und den Zusammenbau vereinfacht
+
 ## Performance
 * dynamische create index sind noch fehlerhaft und werden nicht auf alle Tabellen angewandt
 * Indexes grundsätzlich prüfen

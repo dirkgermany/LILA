@@ -22,9 +22,11 @@ LILA_VERSION constant varchar2(20) := 'v1.3.0';
     TXT_ACK_SHUTDOWN CONSTANT VARCHAR2(30) := 'SERVER_ACK_SHUTDOWN';
     NUM_ACK_SHUTDOWN CONSTANT PLS_INTEGER  := 1010;
     TXT_PING_ECHO    CONSTANT VARCHAR2(30) := 'PING_ECHO';
-    NUM_PING_ECHO CONSTANT PLS_INTEGER  := 100;
-    TXT_SERVER_INFO    CONSTANT VARCHAR2(30) := 'SERVER_INFO';
-    NUM_SERVER_INFO CONSTANT PLS_INTEGER  := 101;
+    NUM_PING_ECHO    CONSTANT PLS_INTEGER  := 100;
+    TXT_SERVER_INFO  CONSTANT VARCHAR2(30) := 'SERVER_INFO';
+    NUM_SERVER_INFO  CONSTANT PLS_INTEGER  := 101;
+    TXT_DATA_ANSWER  CONSTANT VARCHAR2(30) := 'SERVER_DATA_ANSWER';
+    NUM_DATA_ANSWER  CONSTANT VARCHAR2(30) := 102;
     
     -- ================================
     -- Record representing process data
@@ -36,19 +38,19 @@ LILA_VERSION constant varchar2(20) := 'v1.3.0';
         process_start   TIMESTAMP,
         process_end     TIMESTAMP,
         last_update     TIMESTAMP,
-        proc_steps_todo      PLS_INTEGER,
-        proc_steps_done      PLS_INTEGER,
+        proc_steps_todo PLS_INTEGER,
+        proc_steps_done PLS_INTEGER,
         status          PLS_INTEGER,
         info            VARCHAR2(4000),
-        tabNameMaster   VARCHAR2(100)
+        tab_name_master   VARCHAR2(100)
     );
 
     TYPE t_session_init IS RECORD (
         processName VARCHAR2(100),
         logLevel PLS_INTEGER,
-        stepsToDo PLS_INTEGER,
+        proc_stepsToDo PLS_INTEGER,
         daysToKeep PLS_INTEGER,
-        tabNameMaster VARCHAR2(100) DEFAULT 'LILA_LOG'
+        tab_name_master VARCHAR2(100) DEFAULT 'LILA_LOG'
     );
 
 
@@ -83,6 +85,7 @@ LILA_VERSION constant varchar2(20) := 'v1.3.0';
     FUNCTION GET_PROCESS_STATUS(p_processId NUMBER) RETURN PLS_INTEGER;
     FUNCTION GET_PROCESS_INFO(p_processId NUMBER) RETURN VARCHAR2;
     FUNCTION GET_PROCESS_DATA(p_processId NUMBER) RETURN t_process_rec;
+    FUNCTION GET_PROCESS_DATA_JSON(p_processId NUMBER) return varchar2;
     FUNCTION GET_SERVER_PIPE(p_processId NUMBER) RETURN VARCHAR2;
 
     ------------------
@@ -103,22 +106,14 @@ LILA_VERSION constant varchar2(20) := 'v1.3.0';
 
     FUNCTION CREATE_SERVER(p_password varchar2) RETURN VARCHAR2;
     procedure START_SERVER(p_pipeName varchar2, p_password varchar2);
-    FUNCTION SERVER_NEW_SESSION(p_payload varchar2) RETURN NUMBER;
+    FUNCTION SERVER_NEW_SESSION(p_jasonString varchar2) RETURN NUMBER;
     FUNCTION SERVER_NEW_SESSION(p_processName varchar2, p_logLevel PLS_INTEGER, 
-            p_monStepsToDo PLS_INTEGER, p_daysToKeep PLS_INTEGER, p_tabNameMaster varchar2) RETURN VARCHAR2;
+            p_procStepsToDo PLS_INTEGER, p_daysToKeep PLS_INTEGER, p_tabNameMaster varchar2) RETURN VARCHAR2;
 
 
     procedure SERVER_SEND_ANY_MSG(p_processId number, p_message varchar2);
     procedure SERVER_SHUTDOWN(p_processId number, p_pipeName varchar2, p_password varchar2);
     procedure SHUTDOWN_ALL_SERVERS;
-
-    
-    -- Schwellenwerte für den Schutz der SGA (besonders 23ai Free)
-    C_THROTTLE_LIMIT    CONSTANT PLS_INTEGER := 1000; -- Max Logs pro Intervall
-    C_THROTTLE_INTERVAL CONSTANT NUMBER      := 1000;   -- Mindestzeit in Millis für Limit
-    C_THROTTLE_SLEEP    CONSTANT NUMBER      := 1.0;   -- Dauer der Atempause
-
-
 
     ----------
     -- Testing

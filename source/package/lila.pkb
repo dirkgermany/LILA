@@ -164,6 +164,7 @@
         procedure sync_process(p_processId number, p_force boolean default false);
         function extractFromJsonStr(p_json_doc varchar2, jsonPath varchar2) return varchar2;
         function extractFromJsonNum(p_json_doc varchar2, jsonPath varchar2) return number;
+        function extractFromJsonTime(p_json_doc varchar2, jsonPath varchar2) return TIMESTAMP;
         procedure flushMonitor(p_processId number);
         function getServerPipeAvailable return varchar2;
         
@@ -178,7 +179,7 @@
                 g_response_codes(TXT_ACK_DECLINE)  := NUM_ACK_DECLINE;
                 g_response_codes(TXT_PING_ECHO)    := NUM_PING_ECHO;
                 g_response_codes(TXT_SERVER_INFO)  := NUM_SERVER_INFO;
-        
+                g_response_codes(TXT_DATA_ANSWER)  := NUM_DATA_ANSWER;
             end if ;
         END initialize_map;
         
@@ -545,7 +546,7 @@
                     proc_steps_done number,
                     status number(2,0),
                     info varchar2(2000),
-                    tabNameMaster varchar2(100)
+                    tab_name_master varchar2(100)
                 )';
                 sqlStmt := replaceNameMasterTable(sqlStmt, C_PARAM_MASTER_TABLE, p_TabNameMaster);
                 run_sql(sqlStmt);
@@ -714,7 +715,7 @@
                 proc_steps_done,
                 status,
                 info,
-                tabNameMaster
+                tab_name_master
             from PH_MASTER_TABLE
             where id = :PH_PROCESS_ID';
             
@@ -1461,7 +1462,7 @@
                 info        = :PH_INFO
             where id = :PH_PROCESS_ID';  
     
-            sqlStatement := replaceNameMasterTable(sqlStatement, C_PARAM_MASTER_TABLE, p_process_rec.tabNameMaster);        
+            sqlStatement := replaceNameMasterTable(sqlStatement, C_PARAM_MASTER_TABLE, p_process_rec.tab_name_master);        
             execute immediate sqlStatement
             USING   p_process_rec.status, 
                     p_process_rec.process_end,
@@ -1565,7 +1566,7 @@
                 status,
                 log_level,
                 info,
-                tabNameMaster
+                tab_name_master
             )
             values (
                 :PH_PROCESS_ID, 
@@ -1710,7 +1711,7 @@
                 'proc_steps_todo'   value p_procStepsToDo,
                 'proc_steps_done'   value p_procStepsDone,
                 'process_info' value p_processInfo,
-                'status'       value p_status
+                'process_status'       value p_status
                 returning varchar2
             )
             into l_payload from dual;
@@ -1759,7 +1760,7 @@
                 'proc_steps_todo'   value p_procStepsToDo,
                 'proc_steps_done'   value p_procStepsDone,
                 'process_info' value p_processInfo,
-                'status'       value p_status
+                'process_status'       value p_status
                 returning varchar2
             )
             into l_payload from dual;
@@ -1925,8 +1926,8 @@
             end if ;
             
            if v_indexSession.EXISTS(p_processId) then
-                if p_status      is not null then g_process_cache(p_processId).status := p_status;        end if ;
-                if p_processInfo is not null then g_process_cache(p_processId).info := p_processInfo;     end if ;
+                if p_status      is not null then g_process_cache(p_processId).status := p_status; end if ;
+                if p_processInfo is not null then g_process_cache(p_processId).info := p_processInfo; end if ;
                 if p_procStepsToDo   is not null then g_process_cache(p_processId).proc_steps_todo := p_procStepsToDo; end if ;
                 if p_procStepsDone   is not null then g_process_cache(p_processId).proc_steps_done := p_procStepsDone; end if ;
     
@@ -1995,23 +1996,79 @@
         end;
         
         --------------------------------------------------------------------------
+
+        function getProcessDataRemote(p_processId number) return t_process_rec
+        as
+            l_payload varchar2(20000); -- Puffer für den JSON-String
+            l_serverMsg varchar2(100);
+            l_response varchar2(20000);
+            l_process_rec t_process_rec;
+        begin
+            -- Erzeugung des JSON-Objekts
+            select json_object(
+                'process_id'   value p_processId
+                returning varchar2
+            )
+            into l_payload from dual;            
+            l_response := waitForResponse(p_processId, 'GET_PROCESS_DATA', l_payload, 5);
+            
+            if l_response in ('TIMEOUT', 'THROTTLED') or
+                l_response like 'ERROR%' then
+               l_serverMsg := 'Server Response Get_PROCESS_DATA: ' || l_response;
+            else                
+                l_payload := JSON_QUERY(l_response, '$.payload');
+                l_process_rec.id                := extractFromJsonStr(l_payload, 'process_id');
+                l_process_rec.process_name      := extractFromJsonStr(l_payload, 'process_name');
+                l_process_rec.log_level         := extractFromJsonNum(l_payload, 'log_level');
+                l_process_rec.process_start     := extractFromJsonTime(l_payload, 'process_start');
+                l_process_rec.process_end       := extractFromJsonTime(l_payload, 'process_end');
+                l_process_rec.last_update       := extractFromJsonTime(l_payload, 'last_update');
+                l_process_rec.info              := extractFromJsonStr(l_payload, 'process_info');
+                l_process_rec.status            := extractFromJsonNum(l_payload, 'process_status');
+                l_process_rec.proc_steps_todo   := extractFromJsonNum(l_payload, 'proc_steps_todo');
+                l_process_rec.proc_steps_done   := extractFromJsonNum(l_payload, 'proc_steps_done');
+                l_process_rec.tab_name_master   := extractFromJsonStr(l_payload, 'tabname_master');            
+            end if ; 
+            
+            return l_process_rec;
+        end;
         
+        --------------------------------------------------------------------------
+
+        FUNCTION GET_PROCESS_DATA_JSON(p_processId NUMBER) return varchar2
+        as
+            l_payload varchar2(32767);
+        begin
+            select json_object(
+                'process_id'   value p_processId
+                returning varchar2
+            )
+            into l_payload from dual;    
+            return l_payload;
+        end;
+
+        --------------------------------------------------------------------------
+
         FUNCTION GET_PROCESS_DATA(p_processId NUMBER) return t_process_rec
         as
+            l_proc_rec t_process_rec;
         begin
+            if is_remote(p_processId) then
+                return getProcessDataRemote(p_processId);
+            end if ;
+
             if v_indexSession.EXISTS(p_processId) then
                 return g_process_cache(p_processId);
             else return null;
             end if ;
         end;
     
+        --------------------------------------------------------------------------
+
         FUNCTION GET_PROC_STEPS_DONE(p_processId NUMBER) return PLS_INTEGER
         as
         begin
-            if v_indexSession.EXISTS(p_processId) then
-                return g_process_cache(p_processId).proc_steps_done;
-            else return 0;
-            end if ;
+            return get_process_data(p_processId).proc_steps_done;
         end;
     
         --------------------------------------------------------------------------
@@ -2019,10 +2076,7 @@
         FUNCTION GET_PROC_STEPS_TODO(p_processId NUMBER) return PLS_INTEGER
         as
         begin
-            if v_indexSession.EXISTS(p_processId) then
-                return g_process_cache(p_processId).proc_steps_todo;
-            else return 0;
-            end if ;
+            return get_process_data(p_processId).proc_steps_todo;
         end;
     
         --------------------------------------------------------------------------
@@ -2030,10 +2084,7 @@
         function GET_PROCESS_START(p_processId NUMBER) return timestamp
         as
         begin
-            if v_indexSession.EXISTS(p_processId) then
-                return g_process_cache(p_processId).process_start;
-            else return null;
-            end if ;
+            return get_process_data(p_processId).process_start;
         end;
         
         --------------------------------------------------------------------------
@@ -2041,10 +2092,7 @@
         function GET_PROCESS_END(p_processId NUMBER) return timestamp
         as
         begin
-            if v_indexSession.EXISTS(p_processId) then
-                return g_process_cache(p_processId).process_end;
-            else return null;
-            end if ;
+            return get_process_data(p_processId).process_end;
         end;
     
         --------------------------------------------------------------------------
@@ -2052,10 +2100,7 @@
         function GET_PROCESS_STATUS(p_processId number) return PLS_INTEGER
         as 
         begin
-            if v_indexSession.EXISTS(p_processId) then
-                return g_process_cache(p_processId).status;
-            else return 0;
-            end if ;
+            return get_process_data(p_processId).status;
         end;
     
         --------------------------------------------------------------------------
@@ -2063,10 +2108,7 @@
         function GET_PROCESS_INFO(p_processId number) return varchar2
         as 
         begin
-            if v_indexSession.EXISTS(p_processId) then
-                return g_process_cache(p_processId).info;
-            else return null;
-            end if ;
+            return get_process_data(p_processId).info;
         end;
           
         --------------------------------------------------------------------------
@@ -2205,7 +2247,6 @@
         as
             v_idx PLS_INTEGER;
         begin
-info(p_processId, 'persist_close_session');
             if is_remote(p_processId) then
                 close_sessionRemote(p_processId, p_procStepsToDo, p_procStepsDone, p_processInfo, p_status);
                 g_remote_sessions.delete(p_processId);
@@ -2219,7 +2260,6 @@ info(p_processId, 'persist_close_session');
     
     --            if  logLevelSilent <= g_sessionList(v_indexSession(p_processId)).log_level then
                     v_idx := v_indexSession(p_processId);
---                    g_sessionList(v_idx).mon_steps_done := p_procStepsDone;        
                     persist_close_session(p_processId,  g_sessionList(v_idx).tabName_master, p_procStepsToDo, p_procStepsDone, p_processInfo, p_status);
             checkLogsBuffer(p_processId, 'vor clearAllSessionData');
                     clearAllSessionData(p_processId);
@@ -2240,26 +2280,26 @@ info(p_processId, 'persist_close_session');
            -- if silent log mode don't do anything
             if p_session_init.logLevel > logLevelSilent then
                 -- Sicherstellen, dass die LOG-Tabellen existieren
-                createLogTables(p_session_init.tabNameMaster);
+                createLogTables(p_session_init.tab_name_master);
             end if ;
     
             select seq_lila_log.nextVal into pProcessId from dual;
             -- persist to session internal table
-            insertSession (p_session_init.tabNameMaster, pProcessId, p_session_init.logLevel);
+            insertSession (p_session_init.tab_name_master, pProcessId, p_session_init.logLevel);
             if p_session_init.logLevel > logLevelSilent then -- and p_session_init.daysToKeep is not null then
     --	        deleteOldLogs(pProcessId, upper(trim(p_session_init.processName)), p_session_init.daysToKeep);
                 persist_new_session(pProcessId, p_session_init.processName, p_session_init.logLevel,  
-                    p_session_init.stepsToDo, p_session_init.daysToKeep, p_session_init.tabNameMaster);
+                    p_session_init.proc_stepsToDo, p_session_init.daysToKeep, p_session_init.tab_name_master);
             end if ;
     
             -- copy new details data to memory
             v_new_rec.id              := pProcessId;
-            v_new_rec.tabNameMaster   := p_session_init.tabNameMaster;
+            v_new_rec.tab_name_master   := p_session_init.tab_name_master;
             v_new_rec.process_name    := p_session_init.processName;
             v_new_rec.process_start   := current_timestamp;
             v_new_rec.process_end     := null;
             v_new_rec.last_update     := null;
-            v_new_rec.proc_steps_todo := p_session_init.stepsToDo;
+            v_new_rec.proc_steps_todo := p_session_init.proc_stepsToDo;
             v_new_rec.proc_steps_done := 0;
             v_new_rec.status          := 0;
             v_new_rec.info            := 'START';
@@ -2278,8 +2318,8 @@ info(p_processId, 'persist_close_session');
             p_session_init.processName := p_processName;
             p_session_init.logLevel := p_logLevel;
             p_session_init.daysToKeep := p_daysToKeep;
-            p_session_init.stepsToDo := p_procStepsToDo;
-            p_session_init.tabNameMaster := p_tabNameMaster;
+            p_session_init.proc_stepsToDo := p_procStepsToDo;
+            p_session_init.tab_name_master := p_tabNameMaster;
         
             return new_session(p_session_init);
         end;
@@ -2293,8 +2333,8 @@ info(p_processId, 'persist_close_session');
             p_session_init.processName := p_processName;
             p_session_init.logLevel := p_logLevel;
             p_session_init.daysToKeep := null;
-            p_session_init.stepsToDo := null;
-            p_session_init.tabNameMaster := p_tabNameMaster;
+            p_session_init.proc_stepsToDo := null;
+            p_session_init.tab_name_master := p_tabNameMaster;
         
             return new_session(p_session_init);
         end;
@@ -2310,8 +2350,8 @@ info(p_processId, 'persist_close_session');
             p_session_init.processName := p_processName;
             p_session_init.logLevel := p_logLevel;
             p_session_init.daysToKeep := p_daysToKeep;
-            p_session_init.stepsToDo := null;
-            p_session_init.tabNameMaster := p_tabNameMaster;
+            p_session_init.proc_stepsToDo := null;
+            p_session_init.tab_name_master := p_tabNameMaster;
         
             return new_session(p_session_init);
         end;
@@ -2390,7 +2430,7 @@ info(p_processId, 'persist_close_session');
         begin
             l_payload := JSON_QUERY(p_message, '$.payload');
             l_processId  := extractFromJsonNum(l_payload, 'process_id');
-            l_status := extractFromJsonNum(l_payload, 'status');
+            l_status := extractFromJsonNum(l_payload, 'process_status');
             l_processInfo := extractFromJsonStr(l_payload, 'process_info');
             l_stepsToDo := extractFromJsonNum(l_payload, 'proc_steps_todo');
             l_procStepsDone := extractFromJsonNum(l_payload, 'proc_steps_done');
@@ -2453,11 +2493,11 @@ info(p_processId, 'persist_close_session');
             l_procStepsToDo   := extractFromJsonStr(l_payload, 'proc_steps_todo');
             l_procStepsDone   := extractFromJsonNum(l_payload, 'proc_steps_done');
             l_processInfo := extractFromJsonNum(l_payload, 'process_info');
-            l_status      := extractFromJsonNum(l_payload, 'status');
+            l_status      := extractFromJsonNum(l_payload, 'process_status');
             
             l_header := '"header":{"msg_type":"SERVER_RESPONSE"}';
             l_meta   := '"meta":{"server_version":"' || LILA_VERSION || '"}';
-            l_data   := '"payload":{"server_message":"' || TXT_ACK_OK || '", ' || get_serverCode(TXT_ACK_OK);
+            l_data   := '"payload":{"server_message":"' || TXT_ACK_OK || '","server_code": ' || get_serverCode(TXT_ACK_OK);
             l_msg := '{' || l_header || ', ' || l_meta || ', ' || l_data || '}';
     
             checkLogsBuffer(l_processId, 'vor CLOSE_SESSION');
@@ -2484,7 +2524,7 @@ info(p_processId, 'persist_close_session');
         begin
             l_header := '"header":{"msg_type":"SERVER_RESPONSE"}';
             l_meta   := '"meta":{"server_version":"' || LILA_VERSION || '"}';
-            l_data   := '"payload":{"server_message":"' || TXT_PING_ECHO || '", ' || get_serverCode(TXT_PING_ECHO);
+            l_data   := '"payload":{"server_message":"' || TXT_PING_ECHO || '","server_code":' || get_serverCode(TXT_PING_ECHO);
             l_msg := '{' || l_header || ', ' || l_meta || ', ' || l_data || '}';
     
             -- no payload, client waits only for unfreezing
@@ -2494,16 +2534,61 @@ info(p_processId, 'persist_close_session');
             
         exception
             when others then
-                dbms_output.enable();
-                dbms_output.put_line('Fehler in doRemote_pingEcho: ' || sqlErrM);
+                null;
         end; 
         
+        -------------------------------------------------------------------------- 
+
+        procedure doRemote_getProcessData(p_clientChannel varchar2, l_message varchar2)
+        as
+            l_processId number;
+            l_payload varchar2(32767);
+            l_process_rec t_process_rec;
+            l_status PLS_INTEGER;
+            l_header varchar2(200);
+            l_meta   varchar2(200);
+            l_msg    varchar2(2000);
+        begin
+            l_processId := extractFromJsonNum(l_message, 'payload.process_id');
+            l_process_rec := GET_PROCESS_DATA(l_processId);   
+
+            select json_object(
+                'process_id'        value l_process_rec.id,
+                'process_name'      value l_process_rec.process_name,
+                'log_level'         value l_process_rec.log_level,
+                'process_start'     value l_process_rec.process_start,
+                'process_end'       value l_process_rec.process_end,
+                'last_update'       value l_process_rec.last_update,
+                'process_info'      value l_process_rec.info,
+                'process_status'    value l_process_rec.status,
+                'proc_steps_todo'   value l_process_rec.proc_steps_todo,
+                'proc_steps_done'   value l_process_rec.proc_steps_done,
+                'tabname_master'    value l_process_rec.tab_name_master
+                returning varchar2
+            )
+            into l_payload from dual;   
+                        
+            l_header := '"header":{"msg_type":"SERVER_RESPONSE"}';
+            l_meta   := '"meta":{"server_version":"' || LILA_VERSION || '", "server_message":"' || TXT_DATA_ANSWER || '","server_code":' || get_serverCode(TXT_DATA_ANSWER) || '}';
+            l_payload := '"payload":' || l_payload;
+            l_msg := '{' || l_header || ', ' || l_meta || ', ' || l_payload || '}';
+             
+            -- no payload, client waits only for unfreezing
+            DBMS_PIPE.RESET_BUFFER; -- Koffer leeren
+            DBMS_PIPE.PACK_MESSAGE(l_msg);        
+            l_status := DBMS_PIPE.SEND_MESSAGE(p_clientChannel, timeout => 0);
+            
+        exception
+            when others then
+                dbms_output.enable();
+                dbms_output.put_line('Fehler in doRemote_getProcessData: ' || sqlErrM);
+        end;    
+
         -------------------------------------------------------------------------- 
         
         procedure doRemote_unfreezeClient(p_clientChannel varchar2, p_message VARCHAR2)
         as
             l_payload varchar2(1600);
-            l_session_init t_session_init;
             l_status PLS_INTEGER;
             l_header varchar2(100);
             l_meta   varchar2(100);
@@ -2512,7 +2597,7 @@ info(p_processId, 'persist_close_session');
         begin
             l_header := '"header":{"msg_type":"SERVER_RESPONSE"}';
             l_meta   := '"meta":{"server_version":"' || LILA_VERSION || '"}';
-            l_data   := '"payload":{"server_message":"' || TXT_ACK_OK || '", ' || get_serverCode(TXT_ACK_OK);
+            l_data   := '"payload":{"server_message":"' || TXT_ACK_OK || '","server_code":' || get_serverCode(TXT_ACK_OK);
             l_msg := '{' || l_header || ', ' || l_meta || ', ' || l_data || '}';
     
             -- no payload, client waits only for unfreezing
@@ -2536,12 +2621,12 @@ info(p_processId, 'persist_close_session');
             l_status PLS_INTEGER;
         begin
             l_payload := JSON_QUERY(p_message, '$.payload');
-            l_processId := extractFromJsonStr(l_payload, 'process_id');
+            l_processId := extractFromJsonNum(l_payload, 'process_id');
             l_session_init.processName := extractFromJsonStr(l_payload, 'process_name');
             l_session_init.logLevel    := extractFromJsonNum(l_payload, 'log_level');
-            l_session_init.stepsToDo   := extractFromJsonNum(l_payload, 'proc_steps_todo');
+            l_session_init.proc_stepsToDo   := extractFromJsonNum(l_payload, 'proc_steps_todo');
             l_session_init.daysToKeep  := extractFromJsonNum(l_payload, 'days_to_keep');
-            l_session_init.tabNameMaster := extractFromJsonStr(l_payload, 'tabname_master');
+            l_session_init.tab_name_master := extractFromJsonStr(l_payload, 'tabname_master');
     
             l_processId := NEW_SESSION(l_session_init);
             DBMS_PIPE.RESET_BUFFER; -- Koffer leeren
@@ -2617,7 +2702,7 @@ info(p_processId, 'persist_close_session');
             return server_new_session(l_payload);
         end;
         
-        FUNCTION SERVER_NEW_SESSION(p_payload varchar2) RETURN NUMBER
+        FUNCTION SERVER_NEW_SESSION(p_jasonString varchar2) RETURN NUMBER
         as
             l_ProcessId number(19,0) := -500;   
             l_payload   varchar2(1000);
@@ -2625,7 +2710,7 @@ info(p_processId, 'persist_close_session');
             jasonObj    JSON_OBJECT_T := JSON_OBJECT_T();
         begin
             -- zunächst mal schauen, welche Server bereitstehen
-            l_response := waitForResponse(null, 'NEW_SESSION', p_payload, C_TIMEOUT_NEW_SESSION);
+            l_response := waitForResponse(null, 'NEW_SESSION', p_jasonString, C_TIMEOUT_NEW_SESSION);
             
             CASE
                 WHEN l_response = 'TIMEOUT' THEN
@@ -2692,24 +2777,6 @@ info(p_processId, 'persist_close_session');
         END;
         
         --------------------------------------------------------------------------
-        function packServerResp(p_serverMsgTxt varchar2) return varchar2
-        as
-            l_header varchar2(100);
-            l_meta   varchar2(100);
-            l_data   varchar2(100);
-            l_msg    varchar2(500);
-        begin
-        
-            l_header := '"header":{"msg_type":"SERVER_RESPONSE"}';
-            l_meta   := '"meta":{"server_version":"' || LILA_VERSION || '"}';
-            l_data   := '"payload":{"server_message":"' || TXT_ACK_SHUTDOWN || '", "server_code":' || get_serverCode(p_serverMsgTxt) || '}';
-            
-            l_msg := '{' || l_header || ', ' || l_meta || ', ' || l_data || '}';
-    
-            return l_msg;
-        end;
-        
-        --------------------------------------------------------------------------
         
         function handleServerShutdown(p_clientChannel varchar2, p_message varchar2) return boolean
         as
@@ -2729,9 +2796,9 @@ info(p_processId, 'persist_close_session');
             l_meta   := '"meta":{"server_version":"' || LILA_VERSION || '"}';
     
             if l_password = g_shutdownPassword then            
-                l_data   := '"payload":{"server_message":"' || TXT_ACK_SHUTDOWN || '", ' || get_serverCode(TXT_ACK_SHUTDOWN);
+                l_data   := '"payload":{"server_message":"' || TXT_ACK_SHUTDOWN || '","server_code": ' || get_serverCode(TXT_ACK_SHUTDOWN);
             else
-                l_data   := '"payload":{"server_message":"' || TXT_ACK_DECLINE || '", ' || get_serverCode(TXT_ACK_DECLINE);
+                l_data   := '"payload":{"server_message":"' || TXT_ACK_DECLINE || '","server_code": ' || get_serverCode(TXT_ACK_DECLINE);
             end if ;
             l_msg := '{' || l_header || ', ' || l_meta || ', ' || l_data || '}';
     
@@ -2923,6 +2990,9 @@ info(p_processId, 'persist_close_session');
                         WHEN 'PROC_STEP_DONE' then
                             doRemote_procStepDone(l_message);
                             
+                        WHEN 'GET_PROCESS_DATA' then
+                            doRemote_getProcessData(l_clientChannel, l_message);
+                            
                         WHEN 'MARK_STEP' then
                             doRemote_markStep(l_message);
                             
@@ -3020,7 +3090,7 @@ info(p_processId, 'persist_close_session');
         EXCEPTION
         WHEN l_stop_server_exception THEN
             -- Hier landen wir nur, wenn der Server gezielt beendet werden soll
-            dbms_output.put_line('Err: ' || sqlerrm);
+            DBMS_OUTPUT.PUT_LINE('Err: ' || sqlerrm);
             ERROR(g_serverProcessId, 'Internal START_SERVER; Critical Error while processing command: ' || SQLERRM);
             
             CLOSE_SESSION(g_serverProcessId);

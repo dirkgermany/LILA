@@ -4,7 +4,7 @@
 Since LILA is a PL/SQL package, only a few steps are required for commissioning and use.
 
 Ultimately, three database objects are required:
-* Two Tables
+* Three Tables
 * One Sequence
 
 All objects are created when the API is used for the first time.

@@ -247,7 +247,7 @@ SELECT my_app.getStatus(1) proc_status FROM dual;
 ## Roadmap
 - [ ] **Automatic Fallback:**
     * switch to the next available server or
-    * graceful degradation from Decoupled to In-Session moode
+    * graceful degradation from Decoupled to In-Session mode
 - [ ] **Process Resumption:**
     * Reconnect to aborted processes via `process_id`
     * **Non-destructive Recovery:** Mark log entries as "superseded" after a re-entry point instead of deleting them, preserving a full audit trail of all attempts

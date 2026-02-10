@@ -4,7 +4,7 @@
 Since LILA is a PL/SQL package, only a few steps are required for commissioning and use.
 
 Ultimately, three database objects are required:
-* Two Tables
+* Three Tables
 * One Sequence
 
 All objects are created when the API is used for the first time.
@@ -21,12 +21,20 @@ If you are new to PL/SQL programming or are using a new database user to try out
 ### Privileges of your schema user
 Grant the user certain rights (also with sysdba rights)
 ```sql
-GRANT EXECUTE ANY PROCEDURE TO USER_NAME;
-GRANT SELECT ANY TABLE TO USER_NAME;
-GRANT CREATE TABLE TO USER_NAME;
+-- Core Privileges (In-Session Mode)
 GRANT CREATE SESSION TO USER_NAME;
-GRANT EXECUTE ON UTL_HTTP TO USER_NAME;
-GRANT EXECUTE ON DBMS_ALERT TO USER_NAME;
+GRANT CREATE TABLE TO USER_NAME;
+GRANT CREATE SEQUENCE TO USER_NAME;
+GRANT EXECUTE ON LILA TO USER_NAME;
+
+-- Server-based Privileges (Decoupled Mode)
+GRANT EXECUTE ON DBMS_PIPE TO USER_NAME;
+GRANT SELECT ON V_$DB_PIPES TO USER_NAME; -- Required for precision server routing
+
+-- Later versions
+GRANT CREATE JOB TO USER_NAME;            -- Required to run LILA-Servers as background job
+GRANT EXECUTE ON UTL_HTTP TO USER_NAME;   -- To allow LILA send metrics via external web services
+
 ```
 
 ### Creating Package

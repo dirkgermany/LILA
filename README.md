@@ -26,16 +26,19 @@ LILA is developed by a developer who hates over-engineered tools. Focus: 5 minut
   - [How to log](#how-to-log)
 - [Monitoring](#monitoring)
   - [How to monitor](#how-to-monitor)
+- [Roadmap](#roadmap)
+
 
 ## Key features
-1. **Lightweight**: One Package, two Tables, one Sequence. That's it!
+1. **Lightweight**: One Package, three Tables, one Sequence. That's it!
 2. **Concurrent Logging**: Supports multiple, simultaneous log entries from the same or different sessions without blocking
 3. **Monitoring**: You have the option to observe your applications via SQL or via the API
-4. **Data Integrity**: Uses autonomous transactions to guarantee log persistence regardless of the main transaction's outcome
-5. **Smart Context Capture**: Automatically records ERR_STACK,  ERR_BACKTRACE, and ERR_CALLSTACK based on log level—deep insights with zero manual effort
-6. **Optional self-cleaning**: Automatically purges expired logs per application during session start—no background jobs or schedulers required
-7. **Future Ready**: Built for the latest Oracle 26ai (2026), and fully tested with existing 19c environment
-8. **Small Footprint**:  ~1k lines of logical PL/SQL code ensures simple quality and security control, fast compilation, zero bloat and minimal Shared Pool utilization (reducing memory pressure and fragmentation)
+4. **Hybrid Execution:**: Run LILA **in-session** (direct) or offload processing to a dedicated LILA-Server (**decoupled**).
+5. **Data Integrity**: Uses autonomous transactions to guarantee log persistence regardless of the main transaction's outcome
+6. **Smart Context Capture**: Automatically records ERR_STACK,  ERR_BACKTRACE, and ERR_CALLSTACK based on log level—deep insights with zero manual effort
+7. **Optional self-cleaning**: Automatically purges expired logs per application during session start—no background jobs or schedulers required
+8. **Future Ready**: Built for the latest Oracle 26ai (2026), and fully tested with existing 19c environment
+9. **Small Footprint**:  ~3k lines of logical PL/SQL code ensures simple quality and security control, fast compilation, zero bloat and minimal Shared Pool utilization (reducing memory pressure and fragmentation)
 
 ---
 ## Fast integration
@@ -49,6 +52,32 @@ LILA is developed by a developer who hates over-engineered tools. Focus: 5 minut
 ---
 ## Advantages
 The following points complement the **Key Features** and provide a deeper insight into the architectural decisions and technical innovations of LILA.
+
+### Direct Mode & Server Mode
+LILA-Logging introduces a high-performance Server-Client architecture using **Oracle Pipes**. This allows for asynchronous log processing and cross-session monitoring
+* **Hybrid Execution:** Combine direct API calls within your session with decoupled processing via dedicated LILA servers. Choose the optimal execution path for each log level or event type in real-time
+* **Smart Load Balancing:** Clients automatically discover available servers via Round-Robin
+* **Auto-Synchronization:** Servers dynamically claim communication pipes, ensuring a zero-config setup
+* **Congestion Control (Throttling):** Optional protection layer that pauses hyperactive clients to ensure server stability during high-load peaks
+
+#### How it works
+LILA offers two execution models that can be used interchangeably:
+1. **In-Session Mode (Direct):** Initiated by `lila.new_session`. Log calls are executed immediately within your current database session. This is ideal for straightforward debugging and ensuring logs are persisted synchronously.
+2. **Decoupled Mode (Server-based):**
+   * **Server Side:** Launch one or more LILA-Servers using `lila.start_server('SERVER_NAME');`. These background processes register under a custom name and monitor for incoming commands. You can scale by running multiple servers for the same name or use different names for logical separation.
+   * **Client Side:** Register via `lila.server_new_session('SERVER_NAME');`. LILA automatically identifies and connects to the specified available server.
+   * **Execution:** Log calls are serialized into a pipe and processed by the background server, minimizing the impact on your transaction time.
+  
+> [!IMPORTANT]
+> **Unified API:** Regardless of the chosen mode, the logging API remains **identical**. You use the same `lila.log(...)` calls throughout your application.
+> The only difference is the initial setup (`lila.new_session` for In-Session vs. `lila.server_new_session` for Decoupled mode).
+
+### Performance & Safety
+LILA prioritizes the stability of your application. It uses a Hybrid Model to balance speed and system integrity:
+* Standard: Fire-and-Forget
+* Logs, metrics, and status updates are handled via Fire-and-Forget to minimize overhead. Zero latency for your business logic.
+* Active Throttling
+* As an optional safeguard, LILA rate-limits hyperactive clients during load peaks to prevent pipe flooding until the bottleneck is cleared.
 
 ### Technology
 #### Autonomous Persistence
@@ -71,11 +100,12 @@ LILA's decoupled architecture is designed for seamless integration with modern m
 
 ### High-Efficiency Monitoring
 
-#### Real-Time Performance Metrics
+#### Real-Time and Granular Action Tracking
 LILA is more than just a logging tool. Using the `MARK_STEP` functionality, named actions can be monitored independently. The framework automatically tracks metrics **per action**:
-*   **Step Duration:** Precise execution time for a specific action's segment.
-*   **Average Duration:** Historical benchmarks to detect performance degradation per action.
-*   **Step Counter:** Monitoring progress and iterations within a specific named workflow.
+* **Independent Statistics:** Monitor multiple activities (e.g., XML_PARSING, FILE_UPLOAD) simultaneously.
+* **Step Duration:** Precise execution time for a specific action's segment.
+* **Average Duration:** Historical benchmarks to detect performance degradation per action.
+* **Zero Client Overhead:** Calculations are processed within the session or offloaded to the server, depending on the chosen mode.
 
 #### Intelligent Metric Calculation
 Instead of performing expensive aggregations across millions of log records for every query, LILA uses an intelligent calculation mechanism. Metrics are updated incrementally, ensuring that monitoring dashboards (e.g., in Grafana, APEX, or Oracle Jet) remain highly responsive even with massive datasets.
@@ -83,10 +113,10 @@ Instead of performing expensive aggregations across millions of log records for 
 ### Core Strengths
 
 #### Scalability & Cloud Readiness
-By avoiding file system dependencies (`UTL_FILE`) and focusing on native database features, LILA is 100% compatible with **Oracle Autonomous Database** and optimized for scalable cloud infrastructures in 2026.
+By avoiding file system dependencies (`UTL_FILE`) and focusing on native database features, LILA is 100% compatible with **Oracle Autonomous Database** and optimized for scalable cloud infrastructures.
 
 #### Developer Experience (DX)
-LILA promotes a standardized error-handling and monitoring culture within development teams. Its easy-to-use API allows for a "zero-config" start, enabling developers to implement professional observability in just a few minutes. No complex DBA grants or extensive infrastructure preparations are required—just deploy the package and start logging immediately.
+LILA promotes a standardized error-handling and monitoring culture within development teams. Its easy-to-use API allows for a "zero-config" start, enabling developers to implement professional observability in just a few minutes. No excessive DBA grants or infrastructure overhead required — just provide standard PL/SQL permissions, deploy the package, and start logging immediately.
 
 ---
 ## Demo
@@ -103,7 +133,6 @@ LILA persists different information about your processes.
 For simplicity, all logs are stored in two tables.
 
 1. The master table contains data about the process itself (the live-dashboard). Always exactly one record per process. This table frees you from complex queries such as “group by,” “max(timestamp),” etc., which you would otherwise have to run on thousands or millions of rows to see the current status of your process.
-
 2. The table with typical detailed log information (the process-history). This second table enables rapid monitoring because the constantly growing number of entries has no impact on the master table.
 
 ***Process information***
@@ -137,7 +166,8 @@ as
   lProcessId number(19,0);
 
 begin
-  -- begin a new logging session
+  -- begin a new logging session (In-Session Mode)
+  -- use lila.server_new_session('NAME', ...) for Decoupled Mode
   -- the last parameter refers to killing log entries which are older than the given number of days
   -- if this param is NULL, no log entry will be deleted
   lProcessId := lila.new_session('my application', lila.logLevelWarn, 30);
@@ -212,6 +242,27 @@ return 'ID = ' || id || '; Status: ' || lProcessStatus || '; Info: ' || lProcess
 SELECT my_app.getStatus(1) proc_status FROM dual;
 > ID = 1; Status: OK; Info: 'just working'; Steps completed: 42
 ```
+
+---
+## Roadmap
+- [ ] **Automatic Fallback:**
+    * switch to the next available server or
+    * graceful degradation from Decoupled to In-Session mode
+- [ ] **Process Resumption:**
+    * Reconnect to aborted processes via `process_id`
+    * **Non-destructive Recovery:** Mark log entries as "superseded" after a re-entry point instead of deleting them, preserving a full audit trail of all attempts
+- [ ] **Adaptive Batching:** Dynamically adjust buffer sizes and flush intervals based on server load to ensure near real-time visibility during low traffic and maximum throughput during peaks
+- [ ] **Zombie Session Handling:** Detect inactive clients, release allocated memory, and update process statuses automatically
+- [ ] **Singleton Server Enforcement:** Prevent multiple servers from registering under the same name to ensure message integrity and avoid process contention
+- [ ] **Resilient Load Balancing:** LILA uses V$DB_PIPES for precision routing. If access is restricted, it seamlessly falls back to registry-based balancing or round-robin to ensure continuous operation.
+- [ ] **Background Server Processing:** Start LILA servers as jobs to avoid blocking sessions
+- [ ] **External Metrics Integration:** Export LILA metrics to web services (e.g., via REST) to enable real-time visualization in Grafana, Prometheus, or ELK.
+- [ ] **Event-Driven Orchestration:**
+    * Trigger automated **Actions** based on defined metric thresholds or event types
+    * Enable seamless **Process Chaining**, where the completion or state of one action triggers subsequent logic
+- [ ] **Smart Alerting Logic:** Refine anomaly detection to distinguish between insignificant micro-variations (e.g., millisecond jitter) and actual performance regressions using configurable noise floors
+
+
 
 ---
 ### Support the Project 💜

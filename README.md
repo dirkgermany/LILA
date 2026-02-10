@@ -286,6 +286,13 @@ LILA is designed for high-concurrency environments. The following results were a
     * Ensure Graceful Shutdown of redundant instances to free up CPU and SGA without data loss
 
 
+## License
+This project is dual-licensed:
+- For **Open Source** use: [GPLv3](LICENSE)
+- For **Commercial** use (internal production or software embedding): [LILA Enterprise License](LICENSE_ENTERPRISE.md)
+
+*If you wish to use LILA in a proprietary environment without the GPL "copyleft" obligations, please contact me for a commercial license.*
+
 
 ---
 ### Support the Project 💜

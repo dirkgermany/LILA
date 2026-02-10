@@ -11,3 +11,15 @@
 
 ## Projekt
 * Ordner docs aufräumen, evtl. anderen Ordner für projektorganisatorische Dinge
+
+## Server as Singleton
+l_lock_result := DBMS_LOCK.REQUEST(
+    lockhandle => l_lock_handle,
+    lockmode   => DBMS_LOCK.X_MODE,
+    timeout    => 0, -- Sofort fehlschlagen, wenn besetzt
+    release_on_commit => FALSE
+);
+
+IF l_lock_result != 0 THEN
+    raise_application_error(-20001, 'LILA-Server läuft bereits.');
+END IF;

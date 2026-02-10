@@ -22,12 +22,12 @@ LILA is used to monitor applications that ultimately represent a process of some
 A process specifically includes its name, lifecycle information, and planned as well as completed work steps. 
 
 ## Session
-A session represents the lifecycle of a process. A process 'lives' within a session. A session is opened once and closed once. For clean, traceable, and consistent process states, the final closing of sessions is indispensable.
+A session represents the lifecycle of a logged process. A process 'lives' within a session. A session is opened once and closed once. For clean, traceable, and consistent process states, the final closing of sessions is indispensable.
 
-### Log Session Life Cycle
+### Session Life Cycle
 **With the beginning** of a Log Session the one and only log entry is written to the *master table*.
-**During** the Log Session this one log entry can be updated and additional informations can be written to the *detail table*.
-**At the end** of a Log Session the log entry again can be updated.
+**During** the Session this one log entry can be updated and additional informations can be written to the *detail table*.
+**At the end** of a Session the log entry again can be updated.
 
 >**Important Note on Data Persistence:**
 >LILA utilizes high-performance in-memory buffering to minimize database load. Monitoring data and process states are collected in RAM and only persisted to the >database once a threshold (e.g., 100 entries) is reached.

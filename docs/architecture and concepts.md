@@ -33,7 +33,7 @@ Regarding the logging of process logs, the severity, the timestamp, and the most
 
 ## Log Level
 Depending on the log level, log messages are either processed or ignored. 
-LILA has one exception, the **Metric Level**: In the hierarchy, this level sits at the threshold for reporting directly after WARN and before INFO. This means that if 'only' WARN is activated, metric messages are ignored; if INFO is activated, all messages except DEBUG are ignored (Operational Insight). 
+LILA has one exception, the **Metric Level**: In the hierarchy, this level sits at the threshold for reporting directly after WARN and before INFO. This means that if 'only' WARN is activated, metric messages are ignored; if INFO is activated, If INFO is activated, all lower-level messages (like DEBUG and TRACE) are ignored (Operational Insight). 
 
 A different log level can be selected for each process.
 

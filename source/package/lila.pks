@@ -38,17 +38,17 @@ CREATE OR REPLACE PACKAGE LILA AS
     -- Record representing process data
     -- ================================
     TYPE t_process_rec IS RECORD (
-        id              NUMBER(19,0),
-        process_name    varchar2(100),
-        log_level       PLS_INTEGER,
-        process_start   TIMESTAMP,
-        process_end     TIMESTAMP,
-        last_update     TIMESTAMP,
-        proc_steps_todo PLS_INTEGER,
-        proc_steps_done PLS_INTEGER,
-        status          PLS_INTEGER,
-        info            VARCHAR2(4000),
-        tab_name_master   VARCHAR2(100)
+        id                  NUMBER(19,0),
+        process_name        VARCHAR2(100),
+        log_level           PLS_INTEGER,
+        process_start       TIMESTAMP,
+        process_end         TIMESTAMP,
+        process_last_update TIMESTAMP,
+        proc_steps_todo     PLS_INTEGER,
+        proc_steps_done     PLS_INTEGER,
+        status              PLS_INTEGER,
+        info                VARCHAR2(4000),
+        tab_name_master     VARCHAR2(100)
     );
 
     TYPE t_session_init IS RECORD (

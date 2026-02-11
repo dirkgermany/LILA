@@ -191,7 +191,7 @@ Ends a logging session with optional final informations. Four function signature
 
 
 > [!IMPORTANT]
-> Since LILA utilizes high-performance buffering, calling CLOSE_SESSION is essential to ensure that all remaining data is flushed and securely written to the database. To prevent data loss during an unexpected application crash, ensure that CLOSE_SESSION is part of your exception handling:
+> Since LILA utilizes high-performance buffering, calling `CLOSE_SESSION` is essential to ensure that all remaining data is flushed and securely written to the database. To prevent data loss during an unexpected application crash, ensure that CLOSE_SESSION is part of your exception handling:
   
 ```sql
 EXCEPTION WHEN OTHERS THEN
@@ -223,6 +223,7 @@ Documents the lifecycle of a process.
 | [`GET_PROCESS_INFO`](#function-get_process_info) | FUNCTION | Returns info text about process
 | [`GET_PROCESS_DATA`](#function-get_process_data) | FUNCTION | Returns all process data as a record (see below) 
 
+**Procedures (Setter)**
   
 #### Procedure SET_PROCESS_STATUS
 The process status provides information about the overall state of the process. This integer value is not evaluated by LILA; its meaning depends entirely on the specific application scenario.
@@ -267,7 +268,10 @@ Sets the total number of completed steps. Note: Calling this procedure overwrite
 > [!NOTE]
 > Whenever a record in the master table is changed, the `last_update field` is updated implicitly. This mechanism is designed to support the monitoring features.
 
+**Functions (Getter)**
+
 #### Function GET_PROC_STEPS_DONE
+Retrieves the number of processed steps.
 
  ```sql
   FUNCTION GET_PROC_STEPS_DONE(
@@ -280,6 +284,7 @@ Sets the total number of completed steps. Note: Calling this procedure overwrite
 * Description: Number of already processed steps (progress)
 
 #### Function GET_PROC_STEPS_TODO
+Retrieves the number of planned process steps. This value has nothing to do with metric actions.
 
  ```sql
   FUNCTION GET_PROC_STEPS_TODO(
@@ -292,6 +297,7 @@ Sets the total number of completed steps. Note: Calling this procedure overwrite
 * Description: Number of planned steps
 
 #### Function GET_PROCESS_START
+Retrieves the time when the process was started with `NEW_SESSION`.
 
  ```sql
   FUNCTION GET_PROCESS_START(
@@ -301,9 +307,24 @@ Sets the total number of completed steps. Note: Calling this procedure overwrite
 
 **Returns**
 * Type: TIMESTAMP
-* Description: Numeric state of the process; depends entirely on the specific application scenario 
+* Description: This value cannot be changed by the API
+
+
+#### Function GET_PROCESS_END
+Retrieves the time when the process was finalized by `CLOSE_SESSION`.
+
+ ```sql
+  FUNCTION GET_PROCESS_END(
+    p_processId     NUMBER
+  )
+ ```
+
+**Returns**
+* Type: TIMESTAMP
+* Description: This value cannot be changed by the API
 
 #### Function GET_PROCESS_STATUS
+Reads the numerical status of a process. The status values are not part of the LILA specification.
 
  ```sql
   FUNCTION GET_PROCESS_STATUS(
@@ -312,23 +333,44 @@ Sets the total number of completed steps. Note: Calling this procedure overwrite
  ```
 
 **Returns**
-* Type: PLS_INTEGER
-* Description: Numeric state of the process; depends entirely on the specific application scenario 
+* Type: Reord Type t_process_rec
+* Description: Stores all known data of a process
 
 
-#### Function GET_PROC_STEPS_DONE
+#### Function GET_PROCESS_INFO
+Reads the INFO-Text which is part of the process record. Likewise flexible and contingent on the specific application requirements. 
 
  ```sql
-  FUNCTION GET_PROC_STEPS_DONE(
+  FUNCTION GET_PROCESS_INFO(
     p_processId     NUMBER
   )
  ```
 
+**Returns**
+* Type: VARCHAR2
+* Description: Any info text. 
+
+#### Function GET_PROCESS_DATA
+> [!NOTE]
+> Every query for process data has an impact—albeit minor—on the overall system performance.
+> If such queries occur only sporadically or if only a few attributes are needed (e.g., the number of completed process steps), this impact is negligible. However, if queries are called frequently and several of the functions mentioned above are used (e.g., `GET_PROCESS_INFO`, `GET_PROCESS_STATUS`, `GET_PROC_STEPS_DONE`, ...), it is recommended to request this information collectively.
+> For this purpose, the function `GET_PROCESS_DATA` provides a record containing all relevant process data 'in one go': `t_process_rec` (see below). I recommend using this function whenever multiple data points of a process are of interest.
+
+ ```sql
+  FUNCTION GET_PROCESS_DATA(
+    p_processId     NUMBER
+  )
+ ```
+
+**Returns**
+* Type: t_process_rec
+* Description: Record type containing all essential process metrics. 
 
 
 #### Record Type `t_process_rec`
-Usefull for getting a complete set of all process data.
+Usefull for getting a complete set of all process data. Using this record avoids multiple individual API calls.
 
+```sql
 TYPE t_process_rec IS RECORD (
     id              NUMBER(19,0),
     process_name    varchar2(100),
@@ -342,7 +384,7 @@ TYPE t_process_rec IS RECORD (
     info            VARCHAR2(4000),
     tab_name_master   VARCHAR2(100)
 );
-
+```
 
 ---
 ### Logging

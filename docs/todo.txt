@@ -2,6 +2,8 @@
 * Getter für Metriken
 * Reconnect für Client und Server
 
+## Gezieltes Verbinden des Clients mit einem ausgewählten Server!
+
 ## Code Optimierung
 * Generalisierung der Nachrichten durch eine Methode, die die Elemente header, meta, payload strukturiert und den Zusammenbau vereinfacht
 

@@ -52,6 +52,27 @@ LILA is developed by a developer who hates over-engineered tools. Focus: 5 minut
 >LILA comes ready to test right out of the box, so no custom implementation or coding is required to see the framework in action immediately after setup.
 >Also please have a look to the sample applications 'learn_lila': https://github.com/dirkgermany/LILA-Logging/tree/main/demo/first_steps.
 
+graph TD
+    subgraph "Application Environment"
+        App[Your PL/SQL App] --> API[LILA API]
+    end
+
+    subgraph "LILA Communication Modes"
+        API -->|Local Mode| DB[(Local Oracle DB)]
+        API -->|Decoupled Mode| CNS[SERVER_NEW_SESSION]
+    end
+
+    subgraph "Remote Monitoring"
+        CNS -.->|Implicit & Seamless| SRV[LILA Server]
+        SRV -->|Storage| MDB[(Master Table)]
+        SRV -->|Analysis| MON[Monitoring UI / Dashboard]
+    end
+
+    style App fill:#f9f,stroke:#333,stroke-width:2px
+    style SRV fill:#bbf,stroke:#333,stroke-width:2px
+    style API fill:#dfd,stroke:#333
+
+
 ---
 ## Advantages
 The following points complement the **Key Features** and provide a deeper insight into the architectural decisions and technical innovations of LILA.

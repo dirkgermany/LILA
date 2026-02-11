@@ -1,10 +1,11 @@
 # LILA API
+
 <details>
-<summary>Content</summary>
+<summary>📖<b>Content</summary>b></summary>
 
 - [Functions and Procedures](#functions-and-procedures)
   - [Session related Functions and Procedures](#session-related-functions-and-procedures)
-    - [Function NEW_SESSION](#function-new_session)
+    - [Function NEW_SESSION](#function-new_session--server_new_session)
     - [Procedure CLOSE_SESSION](#procedure-close_session)
     - [Procedure SET_PROCESS_STATUS](#procedure-set_process_status)
     - [Procedure SET_STEPS_TODO](#procedure-set_steps_todo)
@@ -23,9 +24,9 @@
 > [!TIP]
 > This document serves as the LILA API reference, providing a straightforward description of the programming interface. For those new to LILA, I recommend starting with the document ["architecture and concepts.md"](docs/architecture-and-concepts.md), which (hopefully) provides a fundamental understanding of how LILA works. Furthermore, the demos and examples in the #demo folder demonstrate how easily the LILA API can be integrated.
 
-    
+---
 ## Functions and Procedures
-Parameters for procedures and functions can be mandatory, nullable, or optional. In the overview tables, they are marked as follows:
+Parameters for procedures and functions can be mandatory, nullable, or optional and some can have default values.In the overview tables, they are marked as follows:
 
 ### Shortcuts for parameter requirement
 * <a id="M"> ***M***andatory</a>
@@ -45,7 +46,7 @@ Parameters for procedures and functions can be mandatory, nullable, or optional.
 All API calls are the same, independent of whether LILA is used 'locally' or in a 'decoupled' manner. One exception is the function `SERVER_NEW_SESSION`, which initializes the LILA package to function as a dedicated client, managing the communication with the LILA server seamlessly. **The parameters and return value of `SERVER_NEW_SESSION` are identical to those of `NEW_SESSION`.**
 
 
-#### Function NEW_SESSION
+#### Function NEW_SESSION / SERVER_NEW_SESSION
 The `NEW_SESSION` resp. `SERVER_NEW_SESSION` function starts the logging session for a process. This procedure must be called first. Calls to the API without a prior `NEW_SESSION` do not make sense or can (theoretically) lead to undefined states.
 `NEW_SESSION` and `SERVER_NEW_SESSION` are overloaded so various signatures are available.
 

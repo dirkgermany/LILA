@@ -45,7 +45,7 @@ The functions and procedures are organized into the following five groups:
 ### Session Handling
 
 | Name               | Type      | Description                         | Scope
-| ------------------ | --------- | ----------------------------------- | -------
+| ------------------ | --------- | ----------------------------------- | ---------
 | [NEW_SESSION](#function-new_session--server_new_session) | Function  | Opens a new log session | Session control
 | [SERVER_NEW_SESSION](#function-new_session--server_new_session) | Function  | Opens a new decoupled session | Session control
 | [CLOSE_SESSION](#procedure-close_session) | Procedure | Ends a log session | Session control
@@ -179,9 +179,7 @@ Ends a logging session with optional final informations. Four function signature
  ```
 </details>
 
-
 **Parameters**
-
 
 | Parameter | Type | Description | Required
 | --------- | ---- | ----------- | -------
@@ -194,8 +192,7 @@ Ends a logging session with optional final informations. Four function signature
 
 > [!IMPORTANT]
 > Since LILA utilizes high-performance buffering, calling CLOSE_SESSION is essential to ensure that all remaining data is flushed and securely written to the database. To prevent data loss during an unexpected application crash, ensure that CLOSE_SESSION is part of your exception handling:
-
-
+  
 ```sql
 EXCEPTION WHEN OTHERS THEN
     -- Flushes buffered data and logs the error state before terminating
@@ -209,20 +206,143 @@ EXCEPTION WHEN OTHERS THEN
 
 ---
 ### Process Control
+Documents the lifecycle of a process.
 
-#### Setting Values
 
 | Name               | Type      | Description                         | Scope
 | ------------------ | --------- | ----------------------------------- | -------
-| [`SET_PROCESS_STATUS`](#procedure-set_process_status) | Procedure | Sets the state of the log status | Log Session
-| [`SET_STEPS_TODO`](#procedure-set_steps_todo) | Procedure | Sets the required number of actions | Log Session
-| [`SET_STEPS_DONE`](#procedure-set_steps_todo) | Procedure | Sets the number of completed actions | Log Session
-| [`STEP_DONE`](#procedure-step_done) | Procedure | Increments the counter of completed steps | Log Session
+| [`SET_PROCESS_STATUS`](#procedure-set_process_status) | Procedure | Sets the state of the log status | Process
+| [`SET_STEPS_TODO`](#procedure-set_steps_todo) | Procedure | Sets the required number of actions | Process
+| [`STEP_DONE`](#procedure-step_done) | Procedure | Increments the counter of completed steps | Process
+| [`SET_STEPS_DONE`](#procedure-set_steps_todo) | Procedure | Sets the number of completed actions | Process
+| [`GET_PROC_STEPS_DONE`](fFunction-get_proc_steps_done) | FUNCTION | Returns number of already finished steps | Process
+| [`GET_PROC_STEPS_TODO`](fFunction-get_proc_steps_done) | FUNCTION | Returns number of steps to do
+| [`GET_PROCESS_START`](#function-get_process_start) | FUNCTION | Returns time of process start
+| [`GET_PROCESS_END`](#function-get_process_end) | FUNCTION | Returns time of process end (if finished)
+| [`GET_PROCESS_STATUS`](#function-get_process_status) | FUNCTION | Returns the process state
+| [`GET_PROCESS_INFO`](#function-get_process_info) | FUNCTION | Returns info text about process
+| [`GET_PROCESS_DATA`](#function-get_process_data) | FUNCTION | Returns all process data as a record (see below) 
+
+  
+#### Procedure SET_PROCESS_STATUS
+The process status provides information about the overall state of the process. This integer value is not evaluated by LILA; its meaning depends entirely on the specific application scenario.
+
+ ```sql
+  PROCEDURE SET_PROCESS_STATUS(
+    p_processId     NUMBER,
+    p_processStatus PLS_INTEGER
+  )
+ ```
+
+#### Procedure SET_STEPS_TODO
+This value specifies the planned number of work steps for the entire process. There is no correlation between this value and the actual number of actions recorded within the metrics.
+
+ ```sql
+  PROCEDURE SET_STEPS_TODO(
+    p_processId     NUMBER,
+    p_stepsToDo     PLS_INTEGER
+  )
+
+ ```
+
+#### Procedure STEP_DONE
+Increments the number of completed steps (progress). This simplifies the management of this value within the application.
+
+ ```sql
+  PROCEDURE SET_STEPS_DONE(
+    p_processId     NUMBER
+  )
+ ```
+
+#### Procedure SET_STEPS_DONE
+Sets the total number of completed steps. Note: Calling this procedure overwrites any progress previously calculated via `STEP_DONE`.
+
+ ```sql
+  PROCEDURE SET_STEPS_DONE(
+    p_processId     NUMBER,
+    p_stepsDone     PLS_INTEGER
+  )
+ ```
 
 > [!NOTE]
-> Whenever a record in the master table is changed, the last_update field is updated implicitly. This mechanism is designed to support the monitoring features.
+> Whenever a record in the master table is changed, the `last_update field` is updated implicitly. This mechanism is designed to support the monitoring features.
 
-#### Querying Values
+#### Function GET_PROC_STEPS_DONE
+
+ ```sql
+  FUNCTION GET_PROC_STEPS_DONE(
+    p_processId     NUMBER
+  )
+ ```
+
+**Returns**
+* Type: PLS_INTEGER
+* Description: Number of already processed steps (progress)
+
+#### Function GET_PROC_STEPS_TODO
+
+ ```sql
+  FUNCTION GET_PROC_STEPS_TODO(
+    p_processId     NUMBER
+  )
+ ```
+
+**Returns**
+* Type: PLS_INTEGER
+* Description: Number of planned steps
+
+#### Function GET_PROCESS_STATUS
+
+ ```sql
+  FUNCTION GET_PROCESS_STATUS(
+    p_processId     NUMBER
+  )
+ ```
+
+**Returns**
+* Type: PLS_INTEGER
+* Description: Numeric state of the process; depends entirely on the specific application scenario 
+
+
+#### Function GET_PROC_STEPS_DONE
+
+ ```sql
+  FUNCTION GET_PROC_STEPS_DONE(
+    p_processId     NUMBER
+  )
+ ```
+
+
+#### Function GET_PROCESS_STATUS
+
+ ```sql
+  FUNCTION GET_PROCESS_STATUS(
+    p_processId     NUMBER
+  )
+ ```
+
+**Returns**
+* Type: PLS_INTEGER
+* Description: Numeric state of the process; depends entirely on the specific application scenario 
+
+
+
+#### Record Type `t_process_rec`
+Usefull for getting a complete set of all process data.
+
+TYPE t_process_rec IS RECORD (
+    id              NUMBER(19,0),
+    process_name    varchar2(100),
+    log_level       PLS_INTEGER,
+    process_start   TIMESTAMP,
+    process_end     TIMESTAMP,
+    last_update     TIMESTAMP,
+    proc_steps_todo PLS_INTEGER,
+    proc_steps_done PLS_INTEGER,
+    status          PLS_INTEGER,
+    info            VARCHAR2(4000),
+    tab_name_master   VARCHAR2(100)
+);
 
 
 ---
@@ -244,120 +364,6 @@ EXCEPTION WHEN OTHERS THEN
 | [`PROCEDURE IS_ALIVE`](#procedure-is-alive) | Procedure | Excecutes a very simple logging session | Test
 
 
-
-
-
-
-
-
-### Session related Functions and Procedures
-Whenever the record in the *master table* is changed, the value of the field last_update will be updated.
-This mechanism is supports the monitoring features.
-
-
-
-#### Procedure SET_PROCESS_STATUS
-Updates the status of a process.
-
-As mentioned at the beginning, there is only one entry in the *master table* for a logging session and the corresponding process.
-The status of the process can be set using the following two variants:
-
-*Option 1 without info as text*
-| Parameter | Type | Description | Required
-| --------- | ---- | ----------- | -------
-| p_processId | NUMBER | ID of the process to which the session applies | [`M`](#m)
-| p_status | NUMBER | Current status of the process (freely selected by the calling package) | [`M`](#m)
-
-*Option 2 with additional info as text*
-| Parameter | Type | Description | Required
-| --------- | ---- | ----------- | -------
-| p_processId | NUMBER | ID of the process to which the session applies | [`M`](#m)
-| p_status | NUMBER | Current status of the process (freely selected by the calling package) | [`M`](#m)
-| p_processInfo | VARCHAR2 | Current information about the process (e.g., a readable status) | [`M`](#m)
-
-**Syntax and Examples**
-```sql
--- Syntax
----------
--- Option 1
-PROCEDURE SET_PROCESS_STATUS(p_processId NUMBER, p_status NUMBER)
--- Option 2
-PROCEDURE SET_PROCESS_STATUS(p_processId NUMBER, p_status NUMBER, p_processInfo VARCHAR2)
-
--- Usage
---------
--- assuming that gProcessId is the global stored process ID
-
--- updating only by a status represented by a number
-lila.set_process_status(gProcessId, 1);
--- updating by using an additional information
-lila.set_process_status(gProcessId, 1, 'OK');
-```
-
-#### Procedure SET_STEPS_TODO
-Updates the number of required steps during the process in the log entry of the *master table*.
-
-| Parameter | Type | Description | Required
-| --------- | ---- | ----------- | -------
-| p_processId | NUMBER | ID of the process to which the session applies | [`M`](#m)
-| p_stepsToDo | NUMBER | defines how many steps must be done during the process | [`M`](#m)
-
-**Syntax and Examples**
-```sql
--- Syntax
----------
-PROCEDURE SET_STEPS_TODO(p_processId NUMBER, p_stepsToDo NUMBER)
-
--- Usage
---------
--- assuming that gProcessId is the global stored process ID
-
--- updating only by a status represented by a number
-lila.set_steps_todo(gProcessId, 100);
-```
-
-#### Procedure SET_STEPS_DONE
-Updates the number of completed steps during the process in the log entry of the *master table*.
-
-| Parameter | Type | Description | Required
-| --------- | ---- | ----------- | -------
-| p_processId | NUMBER | ID of the process to which the session applies | [`M`](#m)
-| p_stepsDone | NUMBER | shows how many steps of the process are already completed | [`M`](#m)
-
-**Syntax and Examples**
-```sql
--- Syntax
----------
-PROCEDURE SET_STEPS_DONE(p_processId NUMBER, p_stepsDone NUMBER)
-
--- Usage
---------
--- assuming that gProcessId is the global stored process ID
-
--- updating only by a status represented by a number
-lila.set_steps_done(gProcessId, 99);
-```
-
-#### Procedure STEP_DONE
-Increments the number of already completed steps in the log entry of the *master table*.
-
-| Parameter | Type | Description | Required
-| --------- | ---- | ----------- | -------
-| p_processId | NUMBER | ID of the process to which the session applies | [`M`](#m)
-
-**Syntax and Examples**
-```sql
--- Syntax
----------
-PROCEDURE STEP_DONE(p_processId NUMBER)
-
--- Usage
---------
--- assuming that gProcessId is the global stored process ID
-
--- something like a trigger
-lila.step_done(gProcessId);
-```
 
 ### Write Logs related Procedures
 #### General Logging Procedures

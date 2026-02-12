@@ -52,7 +52,7 @@
 
 ---
 ## Quick Start
-### Inside Mode
+### In-Session Mode
 The following example shows the simplest way to initialize a session and log a message. 
 LILA uses reasonable defaults, so you only need to provide a process name and the logLevel setting.
 After your application ends there should be two tables:

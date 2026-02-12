@@ -47,6 +47,9 @@ LILA is developed by a developer who hates over-engineered tools. Focus: 5 minut
 
 ## Architecture at a Glance
 
+![LILA Architektur](./images/lila-application-context.svg)
+
+
 ```mermaid
 
 graph LR

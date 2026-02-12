@@ -233,21 +233,24 @@ A code snippet:
 procedure MY_DEMO_PROC
 as
   -- process ID related to your logging process
-  lProcessId number(19,0);
+  l_processId number(19,0);
 
 begin
   -- begin a new logging session ( Mode)
   -- use lila.server_new_session('NAME', ...) for Decoupled Mode
   -- the last parameter refers to killing log entries which are older than the given number of days
   -- if this param is NULL, no log entry will be deleted
-  lProcessId := lila.new_session('my application', lila.logLevelWarn, 30);
+  l_processId := lila.new_session('my application', lila.logLevelDebug, 30);
 
-  -- write a log entry whenever you want
-  lila.info(lProcessId, 'Start');
-  -- for more details...
-  lila.debug(lProcessId, 'Function A');
-  -- e.g. information when an exception was raised
-  lila.error(lProcessId, 'An error occurred');
+  -- write log entries whenever you want
+  lila.info(l_processId, 'Start');
+  lila.debug(l_processId, 'Function A');
+  lila.info(l_processId, 'Something happened');
+
+  -- create monitor markers
+  lila.mark_step(l_processId, 'MY_ACTION');
+  dbms_session.sleep(1); -- wait a second
+  lila.mark_step(l_processId, 'MY_ACTION');
 
   -- also you can change the status during your process runs
   lila.set_process_status(lProcessId, 1, 'DONE');
@@ -276,8 +279,8 @@ SELECT id, status, last_update, ... FROM lila_log WHERE process_name = ... (prov
 ```
 
 >| ID | PROCESS_NAME   | PROCESS_START         | PROCESS_END           | LAST_UPDATE           | STEPS_TO_DO | STEPS_DONE | STATUS | INFO
->| -- | ---------------| --------------------- | --------------------- | --------------------- | ----------- | ---------- | ----- | ------
->| 1  | my application | 12.01.26 18:17:51,... | 12.01.26 18:18:53,... | 12.01.26 18:18:53,... | 100         | 99         | 2     | ERROR
+>| -- | ---------------| --------------------- | --------------------- | --------------------- | ----------- | ---------- | ------ | ------
+>| 1  | my application | 12.01.26 18:17:51,... | 12.01.26 18:18:53,... | 12.01.26 18:18:53,... | 100         | 99         | 2      | ERROR
 
 
 
@@ -287,11 +290,22 @@ SELECT id, status, last_update, ... FROM lila_log WHERE process_name = ... (prov
 SELECT * FROM lila_log_detail WHERE process_id = ...
 ```
 
->| PROCESS_ID | NO | INFO           | LOG_LEVEL | SESSION_TIME    | SESSION_USER | HOST_NAME | ERR_STACK        | ERR_BACKTRACE    | ERR_CALLSTACK
->| ---------- | -- | -------------- | --------- | --------------- | ------------ | --------- | ---------------- | ---------------- | ---------------
->| 1          | 1  | Start          | INFO      | 13.01.26 10:... | SCOTT        | SERVER1   | NULL             | NULL             | NULL
->| 1          | 2  | Function A     | DEBUG     | 13.01.26 11:... | SCOTT        | SERVER1   | NULL             | NULL             | "--- PL/SQL ..." 
->| 1          | 3  | I made a fault | ERROR     | 13.01.26 12:... | SCOTT        | SERVER1   | "--- PL/SQL ..." | "--- PL/SQL ..." | "--- PL/SQL ..."
+The monitoring table consists of two parts: the 'left' one is dedicated to logging, the 'right' one is dedicated to monitoring.
+
+**Logging data**
+
+>| PROCESS_ID | NO | INFO               | LOG_LEVEL | SESSION_TIME    | SESSION_USER | HOST_NAME | ERR_STACK        | ERR_BACKTRACE    | ERR_CALLSTACK    | MONITORING
+>| ---------- | -- | --------------     | --------- | --------------- | ------------ | --------- | ---------------- | ---------------- | ---------------- | ------------
+>| 1          | 1  | Start              | INFO      | 13.01.26 10:... | SCOTT        | SERVER1   | NULL             | NULL             | NULL             | 0
+>| 1          | 2  | Function A         | DEBUG     | 13.01.26 11:... | SCOTT        | SERVER1   | NULL             | NULL             | "--- PL/SQL ..." | 0
+>| 1          | 3  | Something happened | ERROR     | 13.01.26 12:... | SCOTT        | SERVER1   | "--- PL/SQL ..." | "--- PL/SQL ..." | "--- PL/SQL ..." | 0
+
+**Monitoring data**
+
+>| PROCESS_ID | ... | ... | MONITORING | MON_ACTION | MON_STEPS_DONE | MON_USED_MILLIS | MON_AVG_MILLIS
+>| ---------- | --- | --- | ---------- | ---------- | -------------- | --------------- | ---------------
+>| 1          | ... | ... | 1          | MY_ACTION  | 1              | NULL            | NULL
+>| 1          | ... | ... | 1          | MY_ACTION  | 2              | 1000            | 1000
 
 
 #### API

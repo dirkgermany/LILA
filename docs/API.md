@@ -89,9 +89,11 @@ END;
 ```
 
 ### Decoupled (Server) Mode
+
 **Step 1: Start the server (Session A)**
-To use the decoupled mode, you first need to start a LILA server. For this example, use a dedicated session (e.g., a second instance of SQL Developer), as the server will block the session while it is running.
-In production environments you should start the server in background as a `DBMS_JOB`.
+
+To use the decoupled mode, you first need to start a LILA server. For this example, use a dedicated session (e.g., a second instance of SQL Developer), as the server will block the session while it is running. In production environments, the server is typically started as a background process via DBMS_JOB to avoid session blocking.
+By default, the client automatically identifies and connects to the server with the lowest current load. This means the client does not need to know specific server names in advance. (Note: Targeted communication with a specific server instance is an upcoming feature and will be available in a future release.)"
 
 Start the server with 
 
@@ -103,6 +105,7 @@ END;
 ```
 
 **Step 2: Execute the client code (Session B)**
+
 In a separate session, execute the following block. Note that `SERVER_NEW_SESSION` automatically connects to your active server.
 
 ```sql
@@ -115,7 +118,7 @@ BEGIN
   l_sessionInit.logLevel    := logLevelInfo;     -- default is logLevelMonitorr
   
   -- 2. Initialize the session
-  -- Use SERVER_NEW_SESSION instead of NEW_SESSION to connect to a LILA server.
+  -- Use `SERVER_NEW_SESSION` instead of NEW_SESSION to connect to a LILA server.
   -- LILA now acts as a dedicated client, handling communication in the background.
   l_processId := lila.server_new_session(p_sessionInit => l_sessionInit);
   

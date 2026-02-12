@@ -36,7 +36,7 @@ LILA is developed by a developer who hates over-engineered tools. Focus: 5 minut
 1. **Lightweight**: One Package, three Tables, one Sequence. That's it!
 2. **Concurrent Logging**: Supports multiple, simultaneous log entries from the same or different sessions without blocking
 3. **Monitoring**: You have the option to observe your applications via SQL or via the API
-4. **Hybrid Execution:**: Run LILA **in-session** (direct) or offload processing to a dedicated LILA-Server (**decoupled**).
+4. **Hybrid Execution:**: Run LILA **** (direct) or offload processing to a dedicated LILA-Server (**decoupled**).
 5. **Data Integrity**: Uses autonomous transactions to guarantee log persistence regardless of the main transaction's outcome
 6. **Smart Context Capture**: Automatically records ERR_STACK,  ERR_BACKTRACE, and ERR_CALLSTACK based on log level—deep insights with zero manual effort
 7. **Optional self-cleaning**: Automatically purges expired logs per application during session start—no background jobs or schedulers required
@@ -62,8 +62,8 @@ graph LR
         %% -- VERARBEITUNG --
         subgraph MODES ["Processing Modes"]
             direction TB
-            subgraph INSIDE ["LILA-Inside Mode"]
-                LI[Lila Inside Instance]
+            subgraph IN-SESSION ["LILA-In-Session Mode"]
+                LI[Lila In-Session Instance]
             end
             
             subgraph DECOUPLED ["LILA-Decoupled Mode"]
@@ -132,7 +132,7 @@ LILA-Logging introduces a high-performance Server-Client architecture using **Or
 
 #### How it works
 LILA offers two execution models that can be used interchangeably:
-1. **In-Session Mode (Direct):** Initiated by `lila.new_session`. Log calls are executed immediately within your current database session. This is ideal for straightforward debugging and ensuring logs are persisted synchronously.
+1. ** Mode (Direct):** Initiated by `lila.new_session`. Log calls are executed immediately within your current database session. This is ideal for straightforward debugging and ensuring logs are persisted synchronously.
 2. **Decoupled Mode (Server-based):**
    * **Server Side:** Launch one or more LILA-Servers using `lila.start_server('SERVER_NAME');`. These background processes register under a custom name and monitor for incoming commands. You can scale by running multiple servers for the same name or use different names for logical separation.
    * **Client Side:** Register via `lila.server_new_session('SERVER_NAME');`. LILA automatically identifies and connects to the specified available server.
@@ -140,7 +140,7 @@ LILA offers two execution models that can be used interchangeably:
   
 > [!IMPORTANT]
 > **Unified API:** Regardless of the chosen mode, the logging API remains **identical**. You use the same `lila.log(...)` calls throughout your application.
-> The only difference is the initial setup (`lila.new_session` for In-Session vs. `lila.server_new_session` for Decoupled mode).
+> The only difference is the initial setup (`lila.new_session` for  vs. `lila.server_new_session` for Decoupled mode).
 
 ### Performance & Safety
 LILA prioritizes the stability of your application. It uses a Hybrid Model to balance speed and system integrity:
@@ -236,7 +236,7 @@ as
   lProcessId number(19,0);
 
 begin
-  -- begin a new logging session (In-Session Mode)
+  -- begin a new logging session ( Mode)
   -- use lila.server_new_session('NAME', ...) for Decoupled Mode
   -- the last parameter refers to killing log entries which are older than the given number of days
   -- if this param is NULL, no log entry will be deleted
@@ -328,7 +328,7 @@ LILA is designed for high-concurrency environments. The following results were a
 ## Roadmap
 - [ ] **Automatic Fallback:**
     * switch to the next available server or
-    * graceful degradation from Decoupled to In-Session mode
+    * graceful degradation from Decoupled to  mode
 - [ ] **Process Resumption:**
     * Reconnect to aborted processes via `process_id`
 - [ ] **Non-destructive Recovery:** Mark log entries as "superseded" after a re-entry point instead of deleting them, preserving a full audit trail of all attempts

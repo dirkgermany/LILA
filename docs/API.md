@@ -11,7 +11,24 @@
     - [Procedure SET_STEPS_TODO](#procedure-set_steps_todo)
     - [Procedure SET_STEPS_DONE](#procedure-set_steps_done)
     - [Procedure STEP_DONE](#procedure-step_done)
-  - [Write Logs related Procedures](#write-logs-related-procedures)
+  - [Process control](#process-control)
+    - [SET_PROCESS_STATUS](#procedure-set_process_status)
+    - [SET_STEPS_TODO](#procedure-set_steps_todo)
+    - [STEP_DONE](#procedure-step_done)
+    - [SET_STEPS_DONE](#procedure-set_steps_todo)
+    - [GET_PROC_STEPS_DONE](fFunction-get_proc_steps_done)
+    - [GET_PROC_STEPS_TODO](fFunction-get_proc_steps_done)
+    - [GET_PROCESS_START](#function-get_process_start)
+    - [GET_PROCESS_END](#function-get_process_end)
+    - [GET_PROCESS_STATUS](#function-get_process_status)
+    - [GET_PROCESS_INFO](#function-get_process_info)
+    - [GET_PROCESS_DATA](#function-get_process_data)
+  - [Logging](#logging)
+    - [ERROR](#procedure-error)
+    - [WARN](#procedure-warn)
+    - [INFO](#procedure-error)
+    - [DEBUG](#procedure-debug)
+
     - [General Logging Procedures](#general-logging-procedures)
     - [Procedure LOG_DETAIL](#procedure-log_detail)
   - [Appendix](#appendix)
@@ -394,25 +411,6 @@ Reads the INFO-Text which is part of the process record. Likewise flexible and c
 * Type: t_process_rec
 * Description: Record type containing all essential process metrics. 
 
-
-#### Record Type `t_process_rec`
-Usefull for getting a complete set of all process data. Using this record avoids multiple individual API calls.
-
-```sql
-TYPE t_process_rec IS RECORD (
-    id                  NUMBER(19,0),
-    process_name        VARCHAR2(100),
-    log_level           PLS_INTEGER,
-    process_start       TIMESTAMP,
-    process_end         TIMESTAMP,
-    process_last_update TIMESTAMP,
-    proc_steps_todo     PLS_INTEGER,
-    proc_steps_done     PLS_INTEGER,
-    status              PLS_INTEGER,
-    info                VARCHAR2(4000),
-    tab_name_master     VARCHAR2(100)
-);
-```
 ---
 ### Logging
 Likely the most intuitive methods for a developer...
@@ -618,6 +616,7 @@ logLevelDebug   constant number := 8;
 ```
 
 ### Record Type for init
+```sql
 TYPE t_session_init IS RECORD (
     processName VARCHAR2(100),
     logLevel PLS_INTEGER,
@@ -625,3 +624,23 @@ TYPE t_session_init IS RECORD (
     daysToKeep PLS_INTEGER,
     tabNameMaster VARCHAR2(100) DEFAULT 'LILA_LOG'
 );
+```
+
+#### Record Type `t_process_rec`
+Usefull for getting a complete set of all process data. Using this record avoids multiple individual API calls.
+
+```sql
+TYPE t_process_rec IS RECORD (
+    id                  NUMBER(19,0),
+    process_name        VARCHAR2(100),
+    log_level           PLS_INTEGER,
+    process_start       TIMESTAMP,
+    process_end         TIMESTAMP,
+    process_last_update TIMESTAMP,
+    proc_steps_todo     PLS_INTEGER,
+    proc_steps_done     PLS_INTEGER,
+    status              PLS_INTEGER,
+    info                VARCHAR2(4000),
+    tab_name_master     VARCHAR2(100)
+);
+```

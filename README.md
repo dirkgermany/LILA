@@ -132,7 +132,7 @@ LILA-Logging introduces a high-performance Server-Client architecture using **Or
 
 #### How it works
 LILA offers two execution models that can be used interchangeably:
-1. ** Mode (Direct):** Initiated by `lila.new_session`. Log calls are executed immediately within your current database session. This is ideal for straightforward debugging and ensuring logs are persisted synchronously.
+1. **In-Session Mode (Direct):** Initiated by `lila.new_session`. Log calls are executed immediately within your current database session. This is ideal for straightforward debugging and ensuring logs are persisted synchronously.
 2. **Decoupled Mode (Server-based):**
    * **Server Side:** Launch one or more LILA-Servers using `lila.start_server('SERVER_NAME');`. These background processes register under a custom name and monitor for incoming commands. You can scale by running multiple servers for the same name or use different names for logical separation.
    * **Client Side:** Register via `lila.server_new_session('SERVER_NAME');`. LILA automatically identifies and connects to the specified available server.

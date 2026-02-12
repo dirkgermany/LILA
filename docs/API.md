@@ -151,7 +151,6 @@ FUNCTION SERVER_NEW_SESSION(
  ```
 </details>
 
-
 **Parameters**
 
 | Parameter | Type | Description | Required
@@ -175,7 +174,6 @@ BEGIN
   -- Using the "Retention" variant
   v_processId := NEW_SESSION('DATA_IMPORT', 2, 30);
 END;
-
 ```
 
 #### Procedure CLOSE_SESSION
@@ -242,7 +240,6 @@ Ends a logging session with optional final informations. Four function signature
 | p_processInfo | VARCHAR2 | Final information about the process (e.g., a readable status) | [`N`](#n)
 | p_status | PLS_INTEGER | Final status of the process (freely selected by the calling package) | [`N`](#n)
 
-
 > [!IMPORTANT]
 > Since LILA utilizes high-performance buffering, calling `CLOSE_SESSION` is essential to ensure that all remaining data is flushed and securely written to the database. To prevent data loss during an unexpected application crash, ensure that CLOSE_SESSION is part of your exception handling:
   
@@ -256,6 +253,7 @@ EXCEPTION WHEN OTHERS THEN
     );
     RAISE;
 ```
+[↑ Back to Top](#lila-api-reference)
 
 ---
 ### Process Control
@@ -429,6 +427,8 @@ Reads the INFO-Text which is part of the process record. Likewise flexible and c
 * Type: t_process_rec
 * Description: Returns a record of type [`t_process_rec`](#record-type-t-process-rec) containing a complete snapshot of all process data in a single call. 
 
+[↑ Back to Top](#lila-api-reference)
+
 ---
 ### Logging
 Likely the most intuitive methods for a developer...
@@ -488,6 +488,8 @@ Writes a log entry with severity DEBUG. By default, LILA operates 'silently,' me
 | p_processId | NUMBER | ID of the process to which the session applies | [`M`](#m)
 | p_logText   | VARCHAR2 | the log text | [`M`](#m)
 
+[↑ Back to Top](#lila-api-reference)
+
 ---
 ### Metrics
 
@@ -496,10 +498,6 @@ Writes a log entry with severity DEBUG. By default, LILA operates 'silently,' me
 | [`MARK_STEP`](#procedure-mark_step) | Procedure | Sets a metric action | Metrics
 | [`GET_METRIC_AVG_DURATION`](#function-get_metric_avg_duration) | Function | Returns average action time | Metrics
 | [`GET_METRIC_STEPS`](#function-get_metric_steps) | Function | Returns the counter of action steps | Metrics
-
-
-    FUNCTION GET_METRIC_AVG_DURATION(p_processId NUMBER, p_actionName VARCHAR2) return NUMBER;
-    FUNCTION GET_METRIC_STEPS(p_processId NUMBER, p_actionName VARCHAR2) return NUMBER;
 
 
 **Procedures (Setter)**
@@ -550,6 +548,7 @@ Returns the number of markers, grouped by their respective action names.
 | p_processId | NUMBER | ID of the process to which the session applies | [`M`](#m)
 | p_actionName | VARCHAR2 | the log text | [`M`](#m)
 
+[↑ Back to Top](#lila-api-reference)
 
 ---
 ### Server Control
@@ -608,7 +607,9 @@ Retrieves the server name (which also serves as the pipe name). Similar to SERVE
 | p_password | VARCHAR2 | servers identity; no spaces allowed | [`M`](#m)
 | p_serverName | VARCHAR2 | servers identity; no spaces allowed | [`M`](#m)
 
+[↑ Back to Top](#lila-api-reference)
 
+---
 ## Appendix
 ### Log Level
 Depending on the selected log level, additional information is written to the *detail table*.

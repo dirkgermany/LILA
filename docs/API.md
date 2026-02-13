@@ -1,4 +1,4 @@
-# LILA API Reference
+# LILAM API Reference
 
 <details>
 <summary>📖<b>Content</b></summary>
@@ -47,19 +47,19 @@
 
 
 > [!TIP]
-> This document serves as the LILA API reference, providing a straightforward description of the programming interface.
-> For those new to LILA, I recommend starting with the document [architecture and concepts.md](architecture%20and%20concepts.md), which (hopefully) provides a fundamental understanding of how LILA works. Furthermore, the demos and examples in the #demo folder demonstrate how easily the LILA API can be integrated.
+> This document serves as the LILAM API reference, providing a straightforward description of the programming interface.
+> For those new to LILAM, I recommend starting with the document [architecture and concepts.md](architecture%20and%20concepts.md), which (hopefully) provides a fundamental understanding of how LILAM works. Furthermore, the demos and examples in the #demo folder demonstrate how easily the LILAM API can be integrated.
 
 ---
 ## Quick Start
 ### In-Session Mode
 The following example shows the simplest way to initialize a session and log a message. 
-LILA uses reasonable defaults, so you only need to provide a process name and the logLevel setting.
+LILAM uses reasonable defaults, so you only need to provide a process name and the logLevel setting.
 After your application ends there should be two tables:
-* LILA_LOG (the master logging table)
-* LILA_LOG_DETAILS (the detail table with logs and metrics)
+* LILAM_LOG (the master logging table)
+* LILAM_LOG_DETAILS (the detail table with logs and metrics)
 
-And in table LILA_LOG should be stored your first process 'MY_FIRST_SYNC' and in the LILA_LOG_DETAILS should be your first metric markers.
+And in table LILAM_LOG should be stored your first process 'MY_FIRST_SYNC' and in the LILAM_LOG_DETAILS should be your first metric markers.
 
 
 ```sql
@@ -72,18 +72,18 @@ BEGIN
   l_sessionInit.logLevel    := logLevelInfo;     -- default is logLevelMonitorr
   
   -- 2. Initialize the session
-  l_processId := lila.new_session(p_sessionInit => l_sessionInit);
+  l_processId := lilam.new_session(p_sessionInit => l_sessionInit);
   
   -- 3. Start logging
-  lila.info(p_processId => l_processId, p_info => 'LILA is up and running!');
+  lilam.info(p_processId => l_processId, p_info => 'LILAM is up and running!');
   
   -- 4. Mark a work step
-  lila.mark_step(p_processId => l_processId, p_actionName => 'DATA_LOAD');
+  lilam.mark_step(p_processId => l_processId, p_actionName => 'DATA_LOAD');
   dbms_session.sleep(1);
-  lila.mark_step(p_processId => l_processId, p_actionName => 'DATA_LOAD');
+  lilam.mark_step(p_processId => l_processId, p_actionName => 'DATA_LOAD');
   
   -- Missing a COMMIT? 
-  -- Don't worry: LILA uses AUTONOMOUS TRANSACTIONS.
+  -- Don't worry: LILAM uses AUTONOMOUS TRANSACTIONS.
   -- This ensures that logs are stored immediately and independently 
   -- from your main transaction (even if you ROLLBACK).
 END;
@@ -93,7 +93,7 @@ END;
 
 **Step 1: Start the server (Session A)**
 
-To use the decoupled mode, you first need to start a LILA server. For this example, use a dedicated session (e.g., a second instance of SQL Developer), as the server will block the session while it is running. In production environments, the server is typically started as a background process via DBMS_JOB to avoid session blocking.
+To use the decoupled mode, you first need to start a LILAM server. For this example, use a dedicated session (e.g., a second instance of SQL Developer), as the server will block the session while it is running. In production environments, the server is typically started as a background process via DBMS_JOB to avoid session blocking.
 
 By default, the client automatically identifies and connects to the server with the lowest current load. This means the client does not need to know specific server names in advance.
 (Note: Targeted communication with a specific server instance is an upcoming feature and will be available in a future release.)
@@ -102,7 +102,7 @@ Start the server with
 
 ```sql
 BEGIN
-  lila.start_server('MY_FIRST_LILA_SERVER', 'SECURE PASSWORD');
+  lilam.start_server('MY_FIRST_LILAM_SERVER', 'SECURE PASSWORD');
 END;
 /
 ```
@@ -121,20 +121,20 @@ BEGIN
   l_sessionInit.logLevel    := logLevelInfo;     -- default is logLevelMonitorr
   
   -- 2. Initialize the session
-  -- Use SERVER_NEW_SESSION instead of NEW_SESSION to connect to a LILA server.
-  -- LILA now acts as a dedicated client, handling communication in the background.
-  l_processId := lila.server_new_session(p_sessionInit => l_sessionInit);
+  -- Use SERVER_NEW_SESSION instead of NEW_SESSION to connect to a LILAM server.
+  -- LILAM now acts as a dedicated client, handling communication in the background.
+  l_processId := lilam.server_new_session(p_sessionInit => l_sessionInit);
   
   -- 3. Start logging
-  lila.info(p_processId => l_processId, p_info => 'LILA is up and running!');
+  lilam.info(p_processId => l_processId, p_info => 'LILAM is up and running!');
   
   -- 4. Mark a work step
-  lila.mark_step(p_processId => l_processId, p_actionName => 'DATA_LOAD');
+  lilam.mark_step(p_processId => l_processId, p_actionName => 'DATA_LOAD');
   dbms_session.sleep(1);
-  lila.mark_step(p_processId => l_processId, p_actionName => 'DATA_LOAD');
+  lilam.mark_step(p_processId => l_processId, p_actionName => 'DATA_LOAD');
 
   -- 5. Shutdown the server
-  lila.server_shutdown(p_processId => l_processId, p_password => 'SECURE PASSWORD');
+  lilam.server_shutdown(p_processId => l_processId, p_password => 'SECURE PASSWORD');
 
 END;
 /
@@ -167,7 +167,7 @@ The functions and procedures are organized into the following five groups:
 | [CLOSE_SESSION](#procedure-close_session) | Procedure | Ends a log session | Session control
 
 > [!NOTE]
-> All API calls are the same, independent of whether LILA is used 'locally' or in a 'decoupled' manner. One exception is the function `SERVER_NEW_SESSION`, which initializes the LILA package to function as a dedicated client, managing the communication with the LILA server seamlessly.
+> All API calls are the same, independent of whether LILAM is used 'locally' or in a 'decoupled' manner. One exception is the function `SERVER_NEW_SESSION`, which initializes the LILAM package to function as a dedicated client, managing the communication with the LILAM server seamlessly.
 > **The parameters and return value of `SERVER_NEW_SESSION` are nearly identical to those of `NEW_SESSION`.** However, `SERVER_NEW_SESSION` includes an additional parameter to specify a target server. This ensures that the client connects to a specific server instance (e.g., for department-specific or multi-tenant tasks) rather than simply choosing the one with the lowest load.
 
 #### Function NEW_SESSION / SERVER_NEW_SESSION
@@ -185,7 +185,7 @@ To accommodate different logging requirements, the following variants are availa
   FUNCTION NEW_SESSION(
     p_processName   VARCHAR2, 
     p_logLevel      PLS_INTEGER, 
-    p_TabNameMaster VARCHAR2 DEFAULT 'LILA_LOG'
+    p_TabNameMaster VARCHAR2 DEFAULT 'LILAM_LOG'
   )
  ```
 </details>
@@ -198,7 +198,7 @@ FUNCTION NEW_SESSION(
   p_processName   VARCHAR2, 
   p_logLevel      PLS_INTEGER, 
   p_daysToKeep    PLS_INTEGER, 
-  p_TabNameMaster VARCHAR2 DEFAULT 'LILA_LOG'
+  p_TabNameMaster VARCHAR2 DEFAULT 'LILAM_LOG'
 )
  ```
 </details>
@@ -212,7 +212,7 @@ FUNCTION NEW_SESSION(
   p_logLevel      PLS_INTEGER, 
   p_stepsToDo     PLS_INTEGER, 
   p_daysToKeep    PLS_INTEGER, 
-  p_TabNameMaster VARCHAR2 DEFAULT 'LILA_LOG'
+  p_TabNameMaster VARCHAR2 DEFAULT 'LILAM_LOG'
 )
  ```
 </details>
@@ -227,7 +227,7 @@ FUNCTION SERVER_NEW_SESSION(
   p_stepsToDo     PLS_INTEGER, 
   p_daysToKeep    PLS_INTEGER, 
   p_serverName    VARCHAR2,
-  p_TabNameMaster VARCHAR2 DEFAULT 'LILA_LOG'
+  p_TabNameMaster VARCHAR2 DEFAULT 'LILAM_LOG'
 )
  ```
 </details>
@@ -333,19 +333,19 @@ Ends a logging session with optional final informations. Four function signature
 | p_status | PLS_INTEGER | Final status of the process (freely selected by the calling package) | [`N`](#n)
 
 > [!IMPORTANT]
-> Since LILA utilizes high-performance buffering, calling `CLOSE_SESSION` is essential to ensure that all remaining data is flushed and securely written to the database. To prevent data loss during an unexpected application crash, ensure that CLOSE_SESSION is part of your exception handling:
+> Since LILAM utilizes high-performance buffering, calling `CLOSE_SESSION` is essential to ensure that all remaining data is flushed and securely written to the database. To prevent data loss during an unexpected application crash, ensure that CLOSE_SESSION is part of your exception handling:
   
 ```sql
 EXCEPTION WHEN OTHERS THEN
     -- Flushes buffered data and logs the error state before terminating
-    lila.close_session(
+    lilam.close_session(
         p_process_id  => l_proc_id, 
         p_status      => -1,          -- Your custom error status code here
         p_processInfo => SQLERRM      -- Captures the Oracle error message
     );
     RAISE;
 ```
-[↑ Back to Top](#lila-api-reference)
+[↑ Back to Top](#lilam-api-reference)
 
 ---
 ### Process Control
@@ -368,7 +368,7 @@ Documents the lifecycle of a process.
 **Procedures (Setter)**
   
 #### Procedure SET_PROCESS_STATUS
-The process status provides information about the overall state of the process. This integer value is not evaluated by LILA; its meaning depends entirely on the specific application scenario.
+The process status provides information about the overall state of the process. This integer value is not evaluated by LILAM; its meaning depends entirely on the specific application scenario.
 
  ```sql
   PROCEDURE SET_PROCESS_STATUS(
@@ -477,7 +477,7 @@ Retrieves the time when the process was finalized by `CLOSE_SESSION`.
 * Description: This value cannot be changed by the API
 
 #### Function GET_PROCESS_STATUS
-Reads the numerical status of a process. The status values are not part of the LILA specification.
+Reads the numerical status of a process. The status values are not part of the LILAM specification.
 
  ```sql
   FUNCTION GET_PROCESS_STATUS(
@@ -507,7 +507,7 @@ Reads the INFO-Text which is part of the process record. Likewise flexible and c
 > [!NOTE]
 > Every query for process data has an impact—albeit minor—on the overall system performance.
 > If such queries occur only sporadically or if only a few attributes are needed (e.g., the number of completed process steps), this impact is negligible. However, if queries are called frequently and several of the functions mentioned above are used (e.g., `GET_PROCESS_INFO`, `GET_PROCESS_STATUS`, `GET_PROC_STEPS_DONE`, ...), it is recommended to request this information collectively.
-> For this purpose, the function `GET_PROCESS_DATA` provides a record containing all relevant process data 'in one go': [#t_process_rec](#record-type-t_process_rec). This record serves as the exclusive way to retrieve the process name and the tab_name_master attribute. Following LILA's naming convention, the detail table's name is deterministic: it always uses the master table's name as a prefix, followed by the suffix `_DETAIL`.
+> For this purpose, the function `GET_PROCESS_DATA` provides a record containing all relevant process data 'in one go': [#t_process_rec](#record-type-t_process_rec). This record serves as the exclusive way to retrieve the process name and the tab_name_master attribute. Following LILAMs naming convention, the detail table's name is deterministic: it always uses the master table's name as a prefix, followed by the suffix `_DETAIL`.
 
  ```sql
   FUNCTION GET_PROCESS_DATA(
@@ -519,13 +519,13 @@ Reads the INFO-Text which is part of the process record. Likewise flexible and c
 * Type: t_process_rec
 * Description: Returns a record of type [`t_process_rec`](#record-type-t-process-rec) containing a complete snapshot of all process data in a single call. 
 
-[↑ Back to Top](#lila-api-reference)
+[↑ Back to Top](#lilam-api-reference)
 
 ---
 ### Logging
 Likely the most intuitive methods for a developer...
 In this regard, please also refer to the table [# Log Level](#log-level) in the appendix. It provides details on which severity levels are considered—and thus logged—at each activated log level.
-For convenience, the configurable log levels are also declared as constants within the LILA package. You can find them in the appendix under [# Declaration of Log Levels](#declaration-of-log-levels).
+For convenience, the configurable log levels are also declared as constants within the LILAM package. You can find them in the appendix under [# Declaration of Log Levels](#declaration-of-log-levels).
 
 | Name               | Type      | Description                         | Scope
 | ------------------ | --------- | ----------------------------------- | -------
@@ -564,7 +564,7 @@ Writes Log with severity INFO.
   )
  ```
 #### Procedure DEBUG
-Writes a log entry with severity DEBUG. By default, LILA operates 'silently,' meaning it does not raise exceptions to avoid disrupting the main process. However, when log level DEBUG is activated, caught exceptions will be re-thrown.
+Writes a log entry with severity DEBUG. By default, LILAM operates 'silently,' meaning it does not raise exceptions to avoid disrupting the main process. However, when log level DEBUG is activated, caught exceptions will be re-thrown.
 
  ```sql
   PROCEDURE DEBUG(
@@ -580,7 +580,7 @@ Writes a log entry with severity DEBUG. By default, LILA operates 'silently,' me
 | p_processId | NUMBER | ID of the process to which the session applies | [`M`](#m)
 | p_logText   | VARCHAR2 | the log text | [`M`](#m)
 
-[↑ Back to Top](#lila-api-reference)
+[↑ Back to Top](#lilam-api-reference)
 
 ---
 ### Metrics
@@ -597,7 +597,7 @@ Writes a log entry with severity DEBUG. By default, LILA operates 'silently,' me
 #### Procedure MARK_STEP
 Reports a completed work step, which typically represents an intermediate stage in the process lifecycle. For this reason, markers must not be confused with the actual process steps.
 The MARK_STEP procedure reports a completed work step. Markers are distinguished by the `p_actionName` parameter. A process can contain any number of action names, enabling highly granular monitoring.
-With every marker report, LILA calculates:
+With every marker report, LILAM calculates:
 * the time elapsed for this marker since the last report (except, of course, for the very first report of this action name),
 * the total number of reports for this marker to date (simple increment),
 * the average time consumed for all markers sharing the same `p_actionName`, and
@@ -640,11 +640,11 @@ Returns the number of markers, grouped by their respective action names.
 | p_processId | NUMBER | ID of the process to which the session applies | [`M`](#m)
 | p_actionName | VARCHAR2 | the log text | [`M`](#m)
 
-[↑ Back to Top](#lila-api-reference)
+[↑ Back to Top](#lilam-api-reference)
 
 ---
 ### Server Control
-In server mode, LILA acts as a central service provider to deliver several key advantages:
+In server mode, LILAM acts as a central service provider to deliver several key advantages:
 * Centralized Logging & Monitoring: Consolidates all log data and metrics into a single, unified oversight layer.
 * Targeted Orchestration: Manages jobs and data specifically tailored to horizontal or vertical organizational units (e.g., department-specific or multi-tenant environments).
 * Asynchronous Decoupling: Decouples clients from synchronous database operations to improve application responsiveness and stability.
@@ -656,12 +656,12 @@ In server mode, LILA acts as a central service provider to deliver several key a
 
 | Name               | Type      | Description                         | Scope
 | ------------------ | --------- | ----------------------------------- | -------
-| [`START_SERVER`](#procedure-start_server) | Procedure | Starts a LILA-Server | Server control
-| [`SERVER_SHUTDOWN`](#procedure-server_shutdown) | Procedure | Stops a LILA-Server | Server control
+| [`START_SERVER`](#procedure-start_server) | Procedure | Starts a LILAM-Server | Server control
+| [`SERVER_SHUTDOWN`](#procedure-server_shutdown) | Procedure | Stops a LILAM-Server | Server control
 | [`GET_SERVER_PIPE`](#function-get_server_pipe) | Function | Returns the servers communication pipe (`DBMS_PIPE`) | Server control
 
 #### Function START_SERVER
-Starts the LILA server using a specific server (pipe) name. A password is required, which must be provided again when calling SERVER_SHUTDOWN. This security measure ensures that the shutdown cannot be triggered by unauthorized clients.
+Starts the LILAM server using a specific server (pipe) name. A password is required, which must be provided again when calling SERVER_SHUTDOWN. This security measure ensures that the shutdown cannot be triggered by unauthorized clients.
 
  ```sql
   Procedure START_SERVER(
@@ -699,7 +699,7 @@ Retrieves the server name (which also serves as the pipe name). Similar to SERVE
 | p_password | VARCHAR2 | servers identity; no spaces allowed | [`M`](#m)
 | p_serverName | VARCHAR2 | servers identity; no spaces allowed | [`M`](#m)
 
-[↑ Back to Top](#lila-api-reference)
+[↑ Back to Top](#lilam-api-reference)
 
 ---
 ## Appendix
@@ -716,7 +716,7 @@ To do this, the selected log level must be >= the level implied in the logging c
 If you want to suppress any logging, set logLevelSilent as active log level.
 
 #### Declaration of Log Levels
-To simplify usage and improve code readability, constants for the log levels are declared in the specification (lila.pks).
+To simplify usage and improve code readability, constants for the log levels are declared in the specification (lilam.pks).
 
 ```sql
 logLevelSilent  constant number := 0;
@@ -733,7 +733,7 @@ TYPE t_session_init IS RECORD (
     logLevel PLS_INTEGER := logLevelMonitor,
     stepsToDo PLS_INTEGER,
     daysToKeep PLS_INTEGER,
-    tabNameMaster VARCHAR2(100) DEFAULT 'LILA_LOG'
+    tabNameMaster VARCHAR2(100) DEFAULT 'LILAM_LOG'
 );
 ```
 

@@ -25,7 +25,7 @@ LILAM is developed by a developer who hates over-engineered tools. Focus: 5 minu
 - [Advantages](#advantages)
 - [Process Tracking & Monitoring](#process-tracking--monitoring]
   - [How to](#how-to)
-- [Performance benchmark](#performance-benchmark)
+- [Data](#data)
 - [Roadmap](#roadmap)
 - [License](#license)
 
@@ -38,7 +38,7 @@ LILAM is developed by a developer who hates over-engineered tools. Focus: 5 minu
 5. **Data Integrity:** Uses autonomous transactions to guarantee log persistence regardless of the main transaction's outcome
 6. **Smart Context Capture:** Automatically records ERR_STACK,  ERR_BACKTRACE, and ERR_CALLSTACK based on log level—deep insights with zero manual effort
 7. **Optional self-cleaning:** Automatically purges expired logs per application during session start—no background jobs or schedulers required
-8. **Future Ready:** Built for the latest Oracle 26ai (2026), and fully tested with existing 19c environment
+8. **Future Ready:** Built and tested in latest Oracle 26ai (2026) and 19c environment
 9. **Small Footprint:**  ~3k lines of logical PL/SQL code ensures simple quality and security control, fast compilation, zero bloat and minimal Shared Pool utilization (reducing memory pressure and fragmentation)
 
 ---
@@ -157,7 +157,7 @@ LILAM categorizes data by its intended use to ensure maximum performance for sta
   lilam.info(l_processId, 'Start');
 ```
 ---
-
+## Data
 ### Live-Dashboard
 
 ```sql
@@ -192,12 +192,6 @@ SELECT * FROM lilam_log_detail WHERE process_id = <id> AND monitoring = 1
 >| ---------- | --- | --- | ---------- | ---------- | -------------- | --------------- | ---------------
 >| 1          | ... | ... | 1          | MY_ACTION  | 1              | NULL            | NULL
 >| 1          | ... | ... | 1          | MY_ACTION  | 2              | 1000            | 1000
-
-
-### Data Retention & Maintenance
-LILAM manages its storage footprint automatically. When a process starts via NEW_SESSION or SERVER_NEW_SESSION, the system performs a cleanup based on the process name.
-Retention Period: You can specify an optional retention period (default: 100 days). All log and monitor entries for the same process name exceeding this age are physically deleted.
-Immortal Flag: Processes flagged as immortal are exempt from automatic cleanup, ensuring their history is preserved indefinitely for audit purposes.
 
 ---
 ## API

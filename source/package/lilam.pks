@@ -1,5 +1,5 @@
 create or replace PACKAGE LILAM AS
-    /* Complete Doc and last version see https://github.com/dirkgermany/LILAM/docs */
+    /* Complete Doc and last version see https://github.com/dirkgermany/LILA/docs */
 LILAM_VERSION constant varchar2(20) := 'v1.3.0';
 
     -- =========
@@ -42,14 +42,14 @@ LILAM_VERSION constant varchar2(20) := 'v1.3.0';
         proc_steps_done PLS_INTEGER,
         status          PLS_INTEGER,
         info            VARCHAR2(4000),
-        tab_name_master   VARCHAR2(100)
+        tab_name_master VARCHAR2(100)
     );
 
     TYPE t_session_init IS RECORD (
-        processName VARCHAR2(100),
-        logLevel PLS_INTEGER := logLevelMonitor,
-        proc_stepsToDo PLS_INTEGER,
-        daysToKeep PLS_INTEGER,
+        processName     VARCHAR2(100),
+        logLevel        PLS_INTEGER := logLevelMonitor,
+        proc_stepsToDo  PLS_INTEGER,
+        daysToKeep      PLS_INTEGER,
         tab_name_master VARCHAR2(100) DEFAULT 'LILAM_LOG'
     );
 

@@ -1,4 +1,4 @@
-# LILA - LILA Integrated Logging Architecture
+# LILA - LILA IS Logging Architecture
 
 
 [![Release](https://img.shields.io/github/v/release/dirkgermany/LILA-Logging)](https://github.com/dirkgermany/LILA-Logging/releases/latest)

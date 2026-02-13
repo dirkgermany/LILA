@@ -1,5 +1,4 @@
 ## Funktionalität
-* Getter für Metriken
 * Reconnect für Client und Server
 
 ## Server-Gruppen

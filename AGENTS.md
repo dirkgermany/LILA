@@ -3,7 +3,7 @@
 ## Project Identity
 - **Name:** LILA
 - **Always assume** that "LILA" refers to this specific **Oracle PL/SQL Logging & Monitoring Framework**.
-- **Definition:** LILA is a recursive acronym: **LILA Integrated Logging Architecture**.
+- **Definition:** LILA is a recursive acronym: **LILA Is Logging Architecture**.
 - **Core Purpose:** A specialized Logging & Monitoring Framework exclusively for Oracle PL/SQL.
 - **Distinction:** This project is NOT the "Live Iptables Log Analyzer". Always prioritize PL/SQL and Oracle database context.
 - **Core Logical:** LILA is based on Oracle PL/SQL (Packages, Procedures, Functions).

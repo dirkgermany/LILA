@@ -1,23 +1,23 @@
-# LILA Architecture and Concepts
+# LILAM Architecture and Concepts
 
 ## Technical Overview
-LILA utilizes the core functionalities made available by Oracle through its PL/SQL (from version 12 onwards, tested under 19c and 26 AI). LILA itself is a PL/SQL script that can be used by other PL/SQL scripts in various modi operandi.
+LILAM utilizes the core functionalities made available by Oracle through its PL/SQL (from version 12 onwards, tested under 19c and 26 AI). LILAM itself is a PL/SQL script that can be used by other PL/SQL scripts in various modi operandi.
 
-This means LILA is the opposite of "black magic" or over-the-top engineering. By using three tables, indexes, a sequence, and pipes, LILA pursues a 100% Zero-Dependency strategy. In fact, due to the communication via pipes, scenarios are conceivable in which LILA is used in conjunction with non-PL/SQL applications. The security of session, log, and metric data is guaranteed by autonomous transactions. These are sharply separated from data in memory and from the transactions of other applications, ensuring their own COMMIT even if the application had to perform a rollback.
+This means LILAM is the opposite of "black magic" or over-the-top engineering. By using three tables, indexes, a sequence, and pipes, LILAM pursues a 100% Zero-Dependency strategy. In fact, due to the communication via pipes, scenarios are conceivable in which LILAM is used in conjunction with non-PL/SQL applications. The security of session, log, and metric data is guaranteed by autonomous transactions. These are sharply separated from data in memory and from the transactions of other applications, ensuring their own COMMIT even if the application had to perform a rollback.
 
-LILA itself is a package consisting of the usual specification (.pks) and the body (.pkb). The code consists of a few thousand real lines of code; in version 1.3, which already featured most functionalities, it was around 3,000 LOC. The functionalities of the LILA client and the LILA server are entirely part of this code.
+LILAM itself is a package consisting of the usual specification (.pks) and the body (.pkb). The code consists of a few thousand real lines of code; in version 1.3, which already featured most functionalities, it was around 3,000 LOC. The functionalities of the LILAM client and the LILAM server are entirely part of this code.
 
 Installation requires nothing more than copying the code into a suitable DB schema and granting a few permissions. More on this in setup.md.
 
-**Programmatic vs. Declarative:** Whenever possible, I have tried to develop LILA so that it works without configuration tables, files, or the like. Rather, my goal was for the tool's behavior to be controlled through the API—i.e., programmatically. As a developer, I know how annoying it can be to have to struggle through hours of preparation before finally getting 'down to business.' 
+**Programmatic vs. Declarative:** Whenever possible, I have tried to develop LILAM so that it works without configuration tables, files, or the like. Rather, my goal was for the tool's behavior to be controlled through the API—i.e., programmatically. As a developer, I know how annoying it can be to have to struggle through hours of preparation before finally getting 'down to business.' 
 
-In fact, there are currently no configuration table(s), startup scripts, or similar requirements to use the full scope of LILA (as of v1.3.0).
+In fact, there are currently no configuration table(s), startup scripts, or similar requirements to use the full scope of LILAM (as of v1.3.0).
 
 # Terms
-First, some important clarifications of terms within the LILA context.
+First, some important clarifications of terms within the LILAM context.
 
 ## Process
-LILA is used to monitor applications that ultimately represent a process of some kind. A process is therefore something that can be mapped or represented with software. Within the meaning of LILA, the developer determines when a process begins and when it ends. 
+LILAM is used to monitor applications that ultimately represent a process of some kind. A process is therefore something that can be mapped or represented with software. Within the meaning of LILAM, the developer determines when a process begins and when it ends. 
 
 A process specifically includes its name, lifecycle information, and planned as well as completed work steps. 
 
@@ -30,7 +30,7 @@ A session represents the lifecycle of a logged process. A process 'lives' within
 **At the end** of a Session the log entry again can be updated.
 
 >**Important Note on Data Persistence:**
->LILA utilizes high-performance in-memory buffering to minimize database load. Monitoring data and process states are collected in RAM and only persisted to the >database once a threshold (e.g., 100 entries) is reached.
+>LILAM utilizes high-performance in-memory buffering to minimize database load. Monitoring data and process states are collected in RAM and only persisted to the >database once a threshold (e.g., 100 entries) is reached.
 >
 >**To guarantee full data integrity, calling CLOSE_SESSION at the end of your process is mandatory.**
 >
@@ -38,7 +38,7 @@ A session represents the lifecycle of a logged process. A process 'lives' within
 
 Ultimately, all that is required for a complete life cycle is to call the NEW_SESSION function at the beginning of the session and the CLOSE_SESSION procedure at the end of the session.
 
-The session is more of a technical perspective on the workflows within LILA, while the process is the view 'to the outside.' I believe these two terms—session and process—can be used almost synonymously in daily LILA operations. It doesn't really hurt if they are mixed a bit.
+The session is more of a technical perspective on the workflows within LILAM, while the process is the view 'to the outside.' I believe these two terms—session and process—can be used almost synonymously in daily LILAM operations. It doesn't really hurt if they are mixed a bit.
 
 ## Logs / Severity
 These are the usual suspects; SILENT, ERROR, WARN, INFO, DEBUG (in order of their weight). Need I say more? 
@@ -47,7 +47,7 @@ Regarding the logging of process logs, the severity, the timestamp, and the most
 
 ## Log Level
 Depending on the log level, log messages are either processed or ignored. 
-LILA has one exception, the **Metric Level**: In the hierarchy, this level sits at the threshold for reporting directly after WARN and before INFO. This means that if 'only' WARN is activated, metric messages are ignored; if INFO is activated, If INFO is activated, all lower-level messages (like DEBUG and TRACE) are ignored (Operational Insight). 
+LILAM has one exception, the **Metric Level**: In the hierarchy, this level sits at the threshold for reporting directly after WARN and before INFO. This means that if 'only' WARN is activated, metric messages are ignored; if INFO is activated, If INFO is activated, all lower-level messages (like DEBUG and TRACE) are ignored (Operational Insight). 
 
 A different log level can be selected for each process.
 
@@ -59,64 +59,64 @@ This might have been explained a bit complicatedly, so here is an example:
 The process knows actions 'A' and 'B'. Action 'A' is reported several times, action 'B' is reported several times. Totals and time histories for 'A' and 'B' are registered separately.
 
 ## Operating Modes
-LILA features two operating modes that applications can use. It is possible to address these modes in parallel from within an application—I call this 'hybrid usage.'
+LILAM features two operating modes that applications can use. It is possible to address these modes in parallel from within an application—I call this 'hybrid usage.'
 
 ### In-Session
-This form of integration is likely the standard when it comes to incorporating PL/SQL packages. The 'other' package extends the functional scope of the caller; the program flow is **synchronous**, meaning the control flow leaves the calling package, continues in the called package, and then returns. In In-Session mode, LILA is exclusively available to the application.
+This form of integration is likely the standard when it comes to incorporating PL/SQL packages. The 'other' package extends the functional scope of the caller; the program flow is **synchronous**, meaning the control flow leaves the calling package, continues in the called package, and then returns. In In-Session mode, LILAM is exclusively available to the application.
 
 ### Decoupled
 The opposite of synchronous execution in In-Session mode is the **asynchronous** Decoupled mode.
 
-In this mode, LILA functions as a **LILA Server**, which writes status changes, logs, and metrics into the log tables independently of the calling program—the **LILA Client**. Using 'Fire & Forget' via pipes, the LILA Client can deliver large amounts of data in a very short time without being slowed down itself.
+In this mode, LILAM functions as a **LILAM Server**, which writes status changes, logs, and metrics into the log tables independently of the calling program—the **LILAM Client**. Using 'Fire & Forget' via pipes, the LILAM Client can deliver large amounts of data in a very short time without being slowed down itself.
 
 Two exceptions must be considered here:
 
-1. LILA Clients that threaten to flood the channel to the LILA Server due to an excessively high reporting rate are gently and temporarily—and barely noticeably—throttled until the LILA Server has processed the bulk of the load (Backpressure Management). Mind you, we are talking about magnitudes in the millisecond range. This mechanism can be deactivated via an API call in high-end environments, such as powerful ODAs (default is 'active').
+1. LILAM Clients that threaten to flood the channel to the LILAM Server due to an excessively high reporting rate are gently and temporarily—and barely noticeably—throttled until the LILAM Server has processed the bulk of the load (Backpressure Management). Mind you, we are talking about magnitudes in the millisecond range. This mechanism can be deactivated via an API call in high-end environments, such as powerful ODAs (default is 'active').
 
-2. Calls that request data packets from the LILA Server are necessarily synchronous if the application wants to process the response itself afterwards. However, scenarios are also conceivable here in which, for example, LILA Client 'A' requests a data packet from the LILA Server on behalf of LILA Client 'B'. 
+2. Calls that request data packets from the LILAM Server are necessarily synchronous if the application wants to process the response itself afterwards. However, scenarios are also conceivable here in which, for example, LILAM Client 'A' requests a data packet from the LILAM Server on behalf of LILAM Client 'B'. 
 
-This would turn LILA Client 'A' into a producer, the LILA Server into a dispatcher, and LILA Client 'C' into a consumer. **A true Message Broker Architecture!**
+This would turn LILAM Client 'A' into a producer, the LILAM Server into a dispatcher, and LILAM Client 'C' into a consumer. **A true Message Broker Architecture!**
 
-With the possibility of using several LILA Servers in parallel and simultaneously allowing individual clients to speak with multiple LILA Servers (and additionally integrating LILA as a library), the use of LILA is conceivable in a wide variety of scenarios. Load balancing, separation of mission-critical and less critical applications, division into departments or teams, multi-tenancy...
+With the possibility of using several LILAM Servers in parallel and simultaneously allowing individual clients to speak with multiple LILAM Servers (and additionally integrating LILAM as a library), the use of LILAM is conceivable in a wide variety of scenarios. Load balancing, separation of mission-critical and less critical applications, division into departments or teams, multi-tenancy...
 
 ## Tables
-A total of three tables are required for operation and user data, one of which serves solely for the internal synchronization of multiple LILA servers (more on this later). The detailed structure of these tables is described in the README file of the LILA-Logging project on GitHub.
+A total of three tables are required for operation and user data, one of which serves solely for the internal synchronization of multiple LILAM servers (more on this later). The detailed structure of these tables is described in the README file of the LILAM project on GitHub.
 
 ### Master or Process Table
 The process table, also known as the master table, represents the processes. For each process, exactly one entry exists in this master table. During the lifecycle of a process, this data may change—especially the counter for completed process steps (i.e., the work progress). Additional information includes the currently used log level for this process, the name of the process, the timestamps for process start, last reported update, and completion. Another important piece of data is the Session ID, which is used for management.
 
 The number of planned steps as well as the steps already completed are controlled by the application, either by explicitly setting these values or via an API trigger.
 
-**The name of the master table can be chosen freely—within the scope of Oracle naming rules.** By default, the master table is named 'LILA_LOG'.
+**The name of the master table can be chosen freely—within the scope of Oracle naming rules.** By default, the master table is named 'LILAM_LOG'.
 
 ### Detail Table
 The detail table is where log entries and metrics are found. For each process, any number of logs and metrics can exist. The reference for this data is the Process ID from the master table.
 
-The detail table is divided into two areas. One area contains the log messages with timestamps, severity, info text, user, platform, and—depending on the severity—the call stack and the error call stack (the stacks are automatically determined by LILA; the application developer does not need to worry about this).
-> Log entries are created through the corresponding API calls (lila.error, lila.warn, lila.info, lila.debug).
+The detail table is divided into two areas. One area contains the log messages with timestamps, severity, info text, user, platform, and—depending on the severity—the call stack and the error call stack (the stacks are automatically determined by LILAM; the application developer does not need to worry about this).
+> Log entries are created through the corresponding API calls (lilam.error, lilam.warn, lilam.info, lilam.debug).
 
-The other area of the detail table contains the metrics. As explained above, metrics within a process are distinguished by their names. The values are calculated by LILA with each new entry.
-> Metric entries are generated by the lila.mark_step API call.
+The other area of the detail table contains the metrics. As explained above, metrics within a process are distinguished by their names. The values are calculated by LILAM with each new entry.
+> Metric entries are generated by the lilam.mark_step API call.
 
 The name of the detail table is always based on the name of the master table. It consists of the name of the master table plus an attached '_DETAIL' suffix.
-Meaning: If the master table is named 'LILA_LOGGING', the detail table is named 'LILA_LOGGING_DETAIL'. This dependency cannot and must not be broken.
+Meaning: If the master table is named 'LILAM_LOGGING', the detail table is named 'LILAM_LOGGING_DETAIL'. This dependency cannot and must not be broken.
 
 ### Application-Specific Tables
-In the interest of flexibility, it is possible to use dedicated LILA logging tables for different scenarios, applications, or processes. This also requires no configuration table or similar overhead. The names of the master and detail tables are optionally set during the API call to lila.new_session or lila.server_new_session.
+In the interest of flexibility, it is possible to use dedicated LILAM logging tables for different scenarios, applications, or processes. This also requires no configuration table or similar overhead. The names of the master and detail tables are optionally set during the API call to lilam.new_session or lilam.server_new_session.
 
-But beware! The choice of tables and their names should be well-planned to avoid chaos caused by an excessive number of different LILA logging tables.
+But beware! The choice of tables and their names should be well-planned to avoid chaos caused by an excessive number of different LILAM logging tables.
 
 ### Registry Table
-The LILA_SERVER_REGISTRY is used for the coordination and assignment of LILA servers. Its name is fixed.
+The LILAM_SERVER_REGISTRY is used for the coordination and assignment of LILAM servers. Its name is fixed.
 
 ## API
-The LILA API consists of approximately 35 procedures and functions, some of which are overloaded. Since static polymorphism does not change the outcome of the API calls, I am listing only the names of the procedures and functions below. The API can be divided into five groups. For a more detailed view, see the ["API.md"](API.md).
+The LILAM API consists of approximately 35 procedures and functions, some of which are overloaded. Since static polymorphism does not change the outcome of the API calls, I am listing only the names of the procedures and functions below. The API can be divided into five groups. For a more detailed view, see the ["API.md"](API.md).
 
 **API overview:**
 
 ### Session Handling
 * **NEW_SESSION:** Starts a new session.
-* **SERVER_NEW_SESSION:** Starts a new session within a LILA server.
+* **SERVER_NEW_SESSION:** Starts a new session within a LILAM server.
 * **CLOSE_SESSION:** Terminates the lifecycle of the session.
 
 ### Process Control
@@ -132,7 +132,7 @@ The LILA API consists of approximately 35 procedures and functions, some of whic
 * **GET_PROCESS_START:** Returns the start time of the process.
 * **GET_PROCESS_END:** Returns the end time of a process.
 * **GET_PROCESS_STATUS:** Returns a value previously set by the developer as needed.
-* **GET_PROCESS_INFO:** Provides process information; outside of LILA's control.
+* **GET_PROCESS_INFO:** Provides process information; outside of LILAMs control.
 * **GET_PROCESS_DATA:** Returns all process data in a specific structure.
 * **GET_PROCESS_DATA_JSON:** Returns all process data in JSON format.
 
@@ -151,7 +151,7 @@ The LILA API consists of approximately 35 procedures and functions, some of whic
 * **GET_METRIC_STEPS:** Returns the current number of completed work steps for actions with the same name within a process.
 
 ### Server Control
-* **START_SERVER:** Starts a LILA server.
-* **SERVER_SHUTDOWN:** Shuts down a LILA server.
+* **START_SERVER:** Starts a LILAM server.
+* **SERVER_SHUTDOWN:** Shuts down a LILAM server.
 * **GET_SERVER_PIPE:** Returns the name of the pipe used to communicate with the server.
 

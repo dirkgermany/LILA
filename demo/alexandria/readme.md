@@ -1,14 +1,14 @@
 # Demo with "http_util" (Alexandria plsql/sql utility library)
 
 ## About
-**LILA: LILA Is Logging Architecture**
-Logging and monitoring pl/sql applications: https://github.com/dirkgermany/LILA-Logging
+**LILAM: LILAM Is Logging And Monitoring**
+Logging and monitoring pl/sql applications: https://github.com/dirkgermany/LILAM
 
-This demo shows the interaction between http_util (Alexandria pl/sql Utility Library) and LILA.
+This demo shows the interaction between http_util (Alexandria pl/sql Utility Library) and LILAM.
 Alexandria see https://github.com/mortenbra/alexandria-plsql-utils.
 
 ## This demo app
-First, it calls up a valid web address and writes some log entries. Immediately afterwards, it calls up another invalid address.The results of both calls you can see in the tables lila_log and lila_log_detail.
+First, it calls up a valid web address and writes some log entries. Immediately afterwards, it calls up another invalid address.The results of both calls you can see in the tables lilam_log and lilam_log_detail.
 
 Please have a look to the procedure body and see how few calls are needed for an exact logging.
 
@@ -48,24 +48,24 @@ Copy pl/sql code of all package script files (.pks and .pkb) into the sql window
 #### http_util
 You will find http_util.pks and http_util.pkb under https://github.com/mortenbra/alexandria-plsql-utils/tree/master/ora).
 
-#### LILA
-Find the package under https://github.com/dirkgermany/LILA-Logging/tree/main/source/package.
+#### LILAM
+Find the package under https://github.com/dirkgermany/LILAM/tree/main/source/package.
 
 #### Demo
-Same directory as where you found this .md-file: https://github.com/dirkgermany/LILA-Logging/tree/main/demo/alexandria.
+Same directory as where you found this .md-file: https://github.com/dirkgermany/LILAM/tree/main/demo/alexandria.
 
 ---
 ## Try the demo and see log results
 Execution of demo package
 ```sql
-exec lila_demo_http.getBlobFromUrl;
+exec lilam_demo_http.getBlobFromUrl;
 ```
 
 See log entries. The detailed table contains the backtrace and the error stack.
 ```sql
 -- Process overview with status:
-select * from lila_log;
+select * from lilam_log;
 -- Details
-select * from lila_log_detail order by process_id, no;
+select * from lilam_log_detail order by process_id, no;
 
    

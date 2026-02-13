@@ -63,7 +63,7 @@ LILAM is developed by a developer who hates over-engineered tools. Focus: 5 minu
 ## Advantages
 The following points complement the **Key Features** and provide a deeper insight into the architectural decisions and technical innovations of LILAM.
 
-### Direct Mode & Server Mode
+### In-Session Mode & Decoupled Mode
 LILAM introduces a high-performance Server-Client architecture using **Oracle Pipes**. This allows for asynchronous log processing and cross-session monitoring
 * **Hybrid Execution:** Combine direct API calls within your session with decoupled processing via dedicated LILAM servers. Choose the optimal execution path for each log level or event type in real-time
 * **Smart Load Balancing:** Clients automatically discover available servers via Round-Robin
@@ -138,69 +138,34 @@ select * from lilam_log;
 If you have activated dbms output, you will receive an additional message there.
 
 ---
-## Logging
-LILAM persists different information about your processes.
-For simplicity, all logs are stored in two tables.
+## Process Tracking & Monitoring
+LILAM categorizes data by its intended use to ensure maximum performance for status queries and analysis:
+* **Lifecycle & Progress (Master):** One persistent record per process run. It provides real-time answers to: What is currently running? What is the progress (steps done/todo)? What is the overall status?
+* **Monitoring & Metrics:** Tracks individual work steps (actions) within a process. This layer captures performance data, including execution duration, iteration counts, and average processing times.
+* **Logging (History):** Standard operational trace. Persists log entries with severity levels, timestamps, and technical metadata (error stacks, user context) for debugging purposes.
 
-1. The master table contains data about the process itself (the live-dashboard). Always exactly one record per process. This table frees you from complex queries such as “group by,” “max(timestamp),” etc., which you would otherwise have to run on thousands or millions of rows to see the current status of your process.
-2. The table with typical detailed log information (the process-history). This second table enables rapid monitoring because the constantly growing number of entries has no impact on the master table.
+### Key Benefits:
+* No Aggregation Required: Status checks don’t need expensive GROUP BY operations on millions of rows.
+* Immediate Transparency: Identify bottlenecks instantly through recorded action metrics.
+* Centralized Configuration: Log levels and target tables are managed via the master record.
 
-***Process information***
-* Process name
-* Process ID
-* Timestamps process_start
-* Timestamp process_end
-* Timestamp last_update (at end of your process identical with timestamp of process_end)
-* Steps todo and steps done
-* Any info
-* (Last) status
+### How to 
 
-***Detailed information***
-* Process ID
-* Serial number
-* Any info
-* Log level
-* Session time
-* Session user
-* Host name
-* Error stack (when exception was thrown)
-* Error backtrace (depends to log level)
-* Call stack (depends to log level)
-
-### How to log
-A code snippet:
+#### Track a process
 ```sql
-procedure MY_DEMO_PROC
-as
-  -- process ID related to your logging process
-  l_processId number(19,0);
-
-begin
-  -- begin a new logging session ( Mode)
-  -- use lilam.server_new_session('NAME', ...) for Decoupled Mode
-  -- the last parameter refers to killing log entries which are older than the given number of days
-  -- if this param is NULL, no log entry will be deleted
-  l_processId := lilam.new_session('my application', lilam.logLevelDebug, 30);
-
-  -- write log entries whenever you want
+  l_processId := lilam.new_session('my application', lilam.logLevelDebug, 30); -- start new process/session
+  lilam.proc_step_done(l_processId);                                           -- protocol finished main step
+  lilam.set_process_status(l_processId, my_int_status, 'my_text_status');      -- set status of process
+  lilam.close_session(l_processId);                                            -- end process/session
+```
+#### Monitor Actions (Metrics)
+```sql
+  -- implicits count and average duration per marker
+  lilam.mark_step(l_processId, 'my_action');                                   -- observe different actions per process
+```
+### Log Information (History)
+```sql
   lilam.info(l_processId, 'Start');
-  lilam.debug(l_processId, 'Function A');
-  lilam.info(l_processId, 'Something happened');
-
-  -- create monitor markers
-  lilam.mark_step(l_processId, 'MY_ACTION');
-  dbms_session.sleep(1); -- wait a second
-  lilam.mark_step(l_processId, 'MY_ACTION');
-
-  -- also you can change the status during your process runs
-  lilam.set_process_status(lProcessId, 1, 'DONE');
-
-  -- last but not least end the logging session
-  -- optional you can set the numbers of steps to do and steps done 
-  lilam.close_session(lProcessId, 100, 99, 'DONE', 1);
-
-end MY_DEMO_PROC;
-
 ```
 ---
 ## Monitoring
@@ -213,7 +178,7 @@ Monitor your processes according to your requirements:
 Three options:
 
 #### Real-time Progress
-**Live-dashboard data**
+**Live-Dashboard**
 ```sql
 SELECT id, status, last_update, ... FROM lilam_log WHERE process_name = ... (provides the current status of the process)
 ```
@@ -225,14 +190,11 @@ SELECT id, status, last_update, ... FROM lilam_log WHERE process_name = ... (pro
 
 
 #### Deep Dive
-**Historical data**
-```sql
-SELECT * FROM lilam_log_detail WHERE process_id = ...
-```
-
-The monitoring table consists of two parts: the 'left' one is dedicated to logging, the 'right' one is dedicated to monitoring.
-
 **Logging data**
+```sql
+SELECT * FROM lilam_log_detail WHERE process_id = <id> AND monitoring = 0 
+```
+The monitoring table consists of two parts: the 'left' one is dedicated to logging, the 'right' one is dedicated to monitoring.
 
 >| PROCESS_ID | NO | INFO               | LOG_LEVEL | SESSION_TIME    | SESSION_USER | HOST_NAME | ERR_STACK        | ERR_BACKTRACE    | ERR_CALLSTACK    | MONITORING
 >| ---------- | -- | --------------     | --------- | --------------- | ------------ | --------- | ---------------- | ---------------- | ---------------- | ------------
@@ -241,6 +203,9 @@ The monitoring table consists of two parts: the 'left' one is dedicated to loggi
 >| 1          | 3  | Something happened | ERROR     | 13.01.26 12:... | SCOTT        | SERVER1   | "--- PL/SQL ..." | "--- PL/SQL ..." | "--- PL/SQL ..." | 0
 
 **Monitoring data**
+```sql
+SELECT * FROM lilam_log_detail WHERE process_id = <id> AND monitoring = 1 
+```
 
 >| PROCESS_ID | ... | ... | MONITORING | MON_ACTION | MON_STEPS_DONE | MON_USED_MILLIS | MON_AVG_MILLIS
 >| ---------- | --- | --- | ---------- | ---------- | -------------- | --------------- | ---------------

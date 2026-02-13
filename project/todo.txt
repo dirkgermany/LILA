@@ -1,11 +1,6 @@
 ## Funktionalität
 * Reconnect für Client und Server
 
-## Server-Gruppen
-* Server bei Start einen Gruppen-Namen mitteilen
-* Gruppen-Namen in Registry schreiben
-* Optional gezieltes Verbinden des Clients mit einer ausgewählten Server-Gruppe `NEW_SESSION`!
-
 ## Regeln für Alarmierung
 * Eventuell Regel-Tabelle; so kann ein neuer Server, der für eine Gruppe bestimmt ist, die Regeln auslesen
 

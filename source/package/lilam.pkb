@@ -553,17 +553,18 @@ create or replace PACKAGE BODY LILAM AS
                 -- Master table
                 sqlStmt := '
                 create table PH_MASTER_TABLE ( 
-                    id number(19,0),
-                    process_name varchar2(100),
-                    log_level number,
-                    process_start timestamp(6),
-                    process_end timestamp(6),
-                    last_update timestamp(6),
-                    proc_steps_todo number,
-                    proc_steps_done number,
-                    status number(2,0),
-                    info varchar2(2000),
-                    tab_name_master varchar2(100)
+                    id               NUMBER(19,0),
+                    process_name     VARCHAR2(100),
+                    log_level        NUMBER,
+                    process_start    TIMESTAMP(6),
+                    process_end      TIMESTAMP(6),
+                    last_update      TIMESTAMP(6),
+                    proc_steps_todo  NUMBER,
+                    proc_steps_done  NUMBER,
+                    status           NUMBER(2,0),
+                    info             VARCHAR2(2000),
+                    process_immortal NUMBER(1,0) DEFAULT 0,
+                    tab_name_master  VARCHAR2(100)
                 )';
                 sqlStmt := replaceNameMasterTable(sqlStmt, C_PARAM_MASTER_TABLE, p_TabNameMaster);
                 run_sql(sqlStmt);
@@ -662,7 +663,8 @@ create or replace PACKAGE BODY LILAM AS
             sqlStatement := '
             select id from PH_MASTER_TABLE
             where process_end <= sysdate - :PH_DAYS_TO_KEEP
-            and upper(process_name) = upper(:PH_PROCESS_NAME)';
+            and upper(process_name) = upper(:PH_PROCESS_NAME)
+            and process_immortal = 0';
             
             sessionRec := getSessionRecord(p_processId);
             if sessionRec.process_id is null then
@@ -733,6 +735,7 @@ create or replace PACKAGE BODY LILAM AS
                 proc_steps_done,
                 status,
                 info,
+                process_immortal,
                 tab_name_master
             from PH_MASTER_TABLE
             where id = :PH_PROCESS_ID';
@@ -1507,12 +1510,13 @@ create or replace PACKAGE BODY LILAM AS
         begin
             sqlStatement := '
             update PH_MASTER_TABLE
-            set status = :PH_STATUS,
-                last_update = current_timestamp,
-                process_end = :PH_PROCESS_END,
+            set status           = :PH_STATUS,
+                last_update      = current_timestamp,
+                process_end      = :PH_PROCESS_END,
                 proc_steps_todo  = :PH_PROC_STEPS_TODO,
                 proc_steps_done  = :PH_PROC_STEPS_DONE,
-                info        = :PH_INFO
+                info             = :PH_INFO,
+                process_immortal = :PH_IMMORTAL
             where id = :PH_PROCESS_ID';  
     
             sqlStatement := replaceNameMasterTable(sqlStatement, C_PARAM_MASTER_TABLE, p_process_rec.tab_name_master);        
@@ -1522,6 +1526,7 @@ create or replace PACKAGE BODY LILAM AS
                     p_process_rec.proc_steps_todo,
                     p_process_rec.proc_steps_done,
                     p_process_rec.info,
+                    p_process_rec.proc_immortal,
                     p_process_rec.id;
             
             commit;
@@ -1602,7 +1607,7 @@ create or replace PACKAGE BODY LILAM AS
     
         --------------------------------------------------------------------------
     
-        procedure persist_new_session(p_processId NUMBER, p_processName VARCHAR2, p_logLevel PLS_INTEGER, p_procStepsToDo NUMBER, p_daysToKeep NUMBER, p_tabNameMaster varchar2)
+        procedure persist_new_session(p_processId NUMBER, p_processName VARCHAR2, p_logLevel PLS_INTEGER, p_procStepsToDo PLS_INTEGER, p_daysToKeep PLS_INTEGER, p_procImmortal PLS_INTEGER, p_tabNameMaster VARCHAR2)
         as
             pragma autonomous_transaction;
             sqlStatement varchar2(2000);
@@ -1619,6 +1624,7 @@ create or replace PACKAGE BODY LILAM AS
                 status,
                 log_level,
                 info,
+                process_immortal,
                 tab_name_master
             )
             values (
@@ -1632,10 +1638,11 @@ create or replace PACKAGE BODY LILAM AS
                 null,
                 :PH_LOG_LEVEL,
                 ''START'',
+                :PH_IMMORTAL,
                 :PH_TABNAME_MASTER
             )';
             sqlStatement := replaceNameMasterTable(sqlStatement, C_PARAM_MASTER_TABLE, p_TabNameMaster);
-            execute immediate sqlStatement USING p_processId, p_processName, p_procStepsToDo, p_logLevel, upper(p_tabNameMaster);     
+            execute immediate sqlStatement USING p_processId, p_processName, p_procStepsToDo, p_logLevel, p_procImmortal, upper(p_tabNameMaster);     
             commit;
         exception
             when others then
@@ -1802,18 +1809,19 @@ create or replace PACKAGE BODY LILAM AS
         end;
         --------------------------------------------------------------------------
 
-        procedure setAnyStatusRemote(p_processId number, p_status pls_integer, p_processInfo varchar2, p_procStepsToDo pls_integer, p_procStepsDone pls_integer)
+        procedure setAnyStatusRemote(p_processId number, p_status pls_integer, p_processInfo varchar2, p_procStepsToDo pls_integer, p_procStepsDone pls_integer, p_immortal pls_integer)
         as
             l_payload varchar2(32767); -- Puffer für den JSON-String
             l_serverMsg varchar2(100);
         begin
             -- Erzeugung des JSON-Objekts
             select json_object(
-                'process_id'   value p_processId,
+                'process_id'        value p_processId,
                 'proc_steps_todo'   value p_procStepsToDo,
                 'proc_steps_done'   value p_procStepsDone,
-                'process_info' value p_processInfo,
-                'process_status'       value p_status
+                'process_info'      value p_processInfo,
+                'process_status'    value p_status,
+                'process_immortal'  value p_immortal
                 returning varchar2
             )
             into l_payload from dual;
@@ -1969,20 +1977,21 @@ create or replace PACKAGE BODY LILAM AS
          
         --------------------------------------------------------------------------
         
-        procedure setAnyStatus(p_processId number, p_status PLS_INTEGER, p_processInfo varchar2, p_procStepsToDo number, p_procStepsDone number)
+        procedure setAnyStatus(p_processId number, p_status PLS_INTEGER, p_processInfo varchar2, p_procStepsToDo number, p_procStepsDone number, p_procImmortal PLS_INTEGER)
         as
         begin
         
             if is_remote(p_processId) then
-                setAnyStatusRemote(p_processId, p_status, p_processInfo, p_procStepsToDo, p_procStepsDone);
+                setAnyStatusRemote(p_processId, p_status, p_processInfo, p_procStepsToDo, p_procStepsDone, p_procImmortal);
                 return;
             end if ;
             
            if v_indexSession.EXISTS(p_processId) then
-                if p_status      is not null then g_process_cache(p_processId).status := p_status; end if ;
-                if p_processInfo is not null then g_process_cache(p_processId).info := p_processInfo; end if ;
-                if p_procStepsToDo   is not null then g_process_cache(p_processId).proc_steps_todo := p_procStepsToDo; end if ;
-                if p_procStepsDone   is not null then g_process_cache(p_processId).proc_steps_done := p_procStepsDone; end if ;
+                if p_status         is not null then g_process_cache(p_processId).status := p_status; end if ;
+                if p_processInfo    is not null then g_process_cache(p_processId).info := p_processInfo; end if ;
+                if p_procStepsToDo  is not null then g_process_cache(p_processId).proc_steps_todo := p_procStepsToDo; end if ;
+                if p_procStepsDone  is not null then g_process_cache(p_processId).proc_steps_done := p_procStepsDone; end if ;
+                if p_procImmortal   is not null then g_process_cache(p_processId).proc_immortal := p_procImmortal; end if;
     
                 g_sessionList(v_indexSession(p_processId)).process_is_dirty := TRUE;
                 g_dirty_queue(p_processId) := TRUE; -- Damit SYNC_ALL_DIRTY die Session sieht
@@ -2003,7 +2012,7 @@ create or replace PACKAGE BODY LILAM AS
         procedure SET_PROCESS_STATUS(p_processId number, p_status PLS_INTEGER, p_processInfo varchar2)
         as
         begin
-            setAnyStatus(p_processId, p_status, p_processInfo, null, null);
+            setAnyStatus(p_processId, p_status, p_processInfo, null, null, null);
         end;
     
         --------------------------------------------------------------------------
@@ -2011,7 +2020,7 @@ create or replace PACKAGE BODY LILAM AS
         procedure SET_PROCESS_STATUS(p_processId number, p_status PLS_INTEGER)
         as
         begin
-            setAnyStatus(p_processId, p_status, null, null, null);
+            setAnyStatus(p_processId, p_status, null, null, null, null);
         end;
     
         --------------------------------------------------------------------------
@@ -2019,15 +2028,21 @@ create or replace PACKAGE BODY LILAM AS
          procedure SET_PROC_STEPS_TODO(p_processId number, p_procStepsToDo number)
          as
          begin
-            setAnyStatus(p_processId, null, null, p_procStepsToDo, null);
+            setAnyStatus(p_processId, null, null, p_procStepsToDo, null, null);
          end;
        
         --------------------------------------------------------------------------
      
-        procedure SET_proc_steps_done(p_processId number, p_procStepsDone number)
+        procedure SET_PROC_STEPS_DONE(p_processId number, p_procStepsDone number)
         as
         begin
-            setAnyStatus(p_processId, null, null, null, p_procStepsDone);   
+            setAnyStatus(p_processId, null, null, null, p_procStepsDone, null);   
+        end;
+        
+        procedure SET_PROC_IMMORTAL(p_processId number, p_immortal number)
+        as
+        begin
+            setAnyStatus(p_processId, null, null, null, null, p_immortal);
         end;
         
         --------------------------------------------------------------------------
@@ -2044,7 +2059,7 @@ create or replace PACKAGE BODY LILAM AS
 
            if v_indexSession.EXISTS(p_processId) then
                 l_steps := nvl(g_process_cache(p_processId).proc_steps_done, 0) +1;                
-                setAnyStatus(p_processId, null, null, null, l_steps);   
+                setAnyStatus(p_processId, null, null, null, l_steps, null);   
             end if;
         end;
         
@@ -2340,11 +2355,11 @@ create or replace PACKAGE BODY LILAM AS
             execute immediate 'select seq_lilam_log.nextVal from dual' into pProcessId;
             -- persist to session internal table
             insertSession (p_session_init.tab_name_master, pProcessId, p_session_init.logLevel);
-            if p_session_init.logLevel > logLevelSilent then -- and p_session_init.daysToKeep is not null then
-    --	        deleteOldLogs(pProcessId, upper(trim(p_session_init.processName)), p_session_init.daysToKeep);
-                persist_new_session(pProcessId, p_session_init.processName, p_session_init.logLevel,  
-                    p_session_init.proc_stepsToDo, p_session_init.daysToKeep, p_session_init.tab_name_master);
-            end if ;
+--            if p_session_init.logLevel > logLevelSilent then -- and p_session_init.daysToKeep is not null then
+            deleteOldLogs(pProcessId, upper(trim(p_session_init.processName)), p_session_init.daysToKeep);
+            persist_new_session(pProcessId, p_session_init.processName, p_session_init.logLevel,  
+                p_session_init.proc_stepsToDo, p_session_init.daysToKeep, p_session_init.procImmortal, p_session_init.tab_name_master);
+--            end if ;
     
             -- copy new details data to memory
             v_new_rec.id              := pProcessId;
@@ -2479,17 +2494,19 @@ create or replace PACKAGE BODY LILAM AS
             l_status        PLS_INTEGER;
             l_processInfo   VARCHAR2(2000);
             l_stepsToDo     PLS_INTEGER;
-            l_procStepsDone     PLS_INTEGER;
+            l_procStepsDone PLS_INTEGER;
+            l_immortal      PLS_INTEGER;
             l_payload varchar2(1600);
         begin
             l_payload := JSON_QUERY(p_message, '$.payload');
-            l_processId  := extractFromJsonNum(l_payload, 'process_id');
-            l_status := extractFromJsonNum(l_payload, 'process_status');
-            l_processInfo := extractFromJsonStr(l_payload, 'process_info');
-            l_stepsToDo := extractFromJsonNum(l_payload, 'proc_steps_todo');
+            l_processId     := extractFromJsonNum(l_payload, 'process_id');
+            l_status        := extractFromJsonNum(l_payload, 'process_status');
+            l_processInfo   := extractFromJsonStr(l_payload, 'process_info');
+            l_stepsToDo     := extractFromJsonNum(l_payload, 'proc_steps_todo');
             l_procStepsDone := extractFromJsonNum(l_payload, 'proc_steps_done');
+            l_immortal      := extractFromJsonNum(l_payload, 'process_immortal');
             
-            setAnyStatus(l_processId, l_status, l_processInfo, l_stepsToDo, l_procStepsDone);
+            setAnyStatus(l_processId, l_status, l_processInfo, l_stepsToDo, l_procStepsDone, l_immortal);
         end;
         --------------------------------------------------------------------------
 

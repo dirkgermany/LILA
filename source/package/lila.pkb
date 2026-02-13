@@ -592,33 +592,33 @@
                 run_sql(sqlStmt);
             end if;
             
-            if not objectExists('idx_lila_main_id', 'INDEX') then
+            if not objectExists('idx_lilam_main_id', 'INDEX') then
                 sqlStmt := '
-                CREATE INDEX idx_lila_main_id
+                CREATE INDEX idx_lilam_main_id
                 ON PH_MASTER_TABLE (id)';
                 sqlStmt := replaceNameMasterTable(sqlStmt, C_PARAM_MASTER_TABLE, p_TabNameMaster);
                 run_sql(sqlStmt);
             end if ;
     
-            if not objectExists('idx_lila_detail_master', 'INDEX') then
+            if not objectExists('idx_lilam_detail_master', 'INDEX') then
                 sqlStmt := '
-                CREATE INDEX idx_lila_detail_master
+                CREATE INDEX idx_lilam_detail_master
                 ON PH_DETAIL_TABLE (process_id)';
                 sqlStmt := replaceNameDetailTable(sqlStmt, C_PARAM_DETAIL_TABLE, p_TabNameMaster);
                 run_sql(sqlStmt);
             end if ;
     
-            if not objectExists('idx_lila_detail_info', 'INDEX') then
+            if not objectExists('idx_lilam_detail_info', 'INDEX') then
                 sqlStmt := '
-                CREATE INDEX idx_lila_detail_info
+                CREATE INDEX idx_lilam_detail_info
                 ON PH_DETAIL_TABLE (info)';
                 sqlStmt := replaceNameDetailTable(sqlStmt, C_PARAM_DETAIL_TABLE, p_TabNameMaster);
                 run_sql(sqlStmt);
             end if ;
     
-           if not objectExists('idx_lila_cleanup', 'INDEX') then
+           if not objectExists('idx_lilam_cleanup', 'INDEX') then
                 sqlStmt := '
-                CREATE INDEX idx_lila_cleanup 
+                CREATE INDEX idx_lilam_cleanup 
                 ON PH_MASTER_TABLE (process_name, process_end)';
                 sqlStmt := replaceNameMasterTable(sqlStmt, C_PARAM_MASTER_TABLE, p_TabNameMaster);
                 run_sql(sqlStmt);
@@ -2288,7 +2288,7 @@
                 createLogTables(p_session_init.tab_name_master);
             end if ;
     
-            select seq_lila_log.nextVal into pProcessId from dual;
+            select seq_lilam_log.nextVal into pProcessId from dual;
             -- persist to session internal table
             insertSession (p_session_init.tab_name_master, pProcessId, p_session_init.logLevel);
             if p_session_init.logLevel > logLevelSilent then -- and p_session_init.daysToKeep is not null then

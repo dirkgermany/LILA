@@ -161,24 +161,16 @@ LILAM categorizes data by its intended use to ensure maximum performance for sta
 #### Monitor Actions (Metrics)
 ```sql
   -- implicits count and average duration per marker
-  lilam.mark_step(l_processId, 'my_action');                                   -- observe different actions per process
+  lilam.mark_step(l_processId, 'MY_ACTION');                                   -- observe different actions per process
 ```
-### Log Information (History)
+#### Log Information (History)
 ```sql
   lilam.info(l_processId, 'Start');
 ```
 ---
-## Monitoring
-Monitor your processes according to your requirements:
-* Real-time Progress: Query the master table for a single-row snapshot of any running process (steps_todo, steps_done, status, timestamps).
-* Deep Dive (Details): Query the detail table for the full chronological history and error stack of a process.
-* API Access: Use the built-in getter functions to retrieve status and progress directly within your PL/SQL logic or UI components.
 
-### How to monitor
-Three options:
+### Live-Dashboard
 
-#### Real-time Progress
-**Live-Dashboard**
 ```sql
 SELECT id, status, last_update, ... FROM lilam_log WHERE process_name = ... (provides the current status of the process)
 ```

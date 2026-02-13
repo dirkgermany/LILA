@@ -358,9 +358,6 @@ create or replace PACKAGE BODY LILAM AS
             l_sqlStmt := l_sqlStmt || '
             ORDER BY current_load ASC, last_activity DESC 
             FETCH FIRST 1 ROW ONLY';
-            
-dbms_output.enable();
-dbms_output.put_line('--------------- sql: ' || l_sqlStmt);
 
             execute immediate l_sqlStmt into l_serverPipeName;
             return l_serverPipeName;

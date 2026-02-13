@@ -1,11 +1,11 @@
 # LILAM - LILAM Is Logging And Monitoring
 
 
-[![Release](https://img.shields.io/github/v/release/dirkgermany/LILAM-Logging)](https://github.com/dirkgermany/LILAM-Logging/releases/latest)
-[![Status](https://img.shields.io/badge/Status-Production--Ready-brightgreen)](https://github.com/dirkgermany/LILAM-Logging)
+[![Release](https://img.shields.io/github/v/release/dirkgermany/LILAM)](https://github.com/dirkgermany/LILAM/releases/latest)
+[![Status](https://img.shields.io/badge/Status-Production--Ready-brightgreen)](https://github.com/dirkgermany/LILAM)
 [![License: GPL v3](https://img.shields.io/badge/License-GPLv3-blue.svg)](LICENSE)
 [![License: Enterprise](https://img.shields.io/badge/License-Enterprise-brightgreen.svg)](LICENSE_ENTERPRISE.md)
-[![Größe](https://img.shields.io/github/repo-size/dirkgermany/LILAM-Logging)](https://https://github.com/dirkgermany/LILAM-Logging)
+[![Größe](https://img.shields.io/github/repo-size/dirkgermany/LILAM)](https://https://github.com/dirkgermany/LILAM)
 [![Sponsor](https://img.shields.io/badge/Sponsor-LILAM-purple?style=flat-square&logo=github-sponsors)](https://github.com/sponsors/dirkgermany)
 
 

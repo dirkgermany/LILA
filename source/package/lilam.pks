@@ -108,7 +108,9 @@ LILAM_VERSION constant varchar2(20) := 'v1.3.0';
     -------------
     -- Monitoring
     -------------
-    PROCEDURE MARK_STEP(p_processId NUMBER, p_actionName VARCHAR2, p_contextName VARCHAR2, p_timestamp TIMESTAMP DEFAULT NULL);
+    PROCEDURE MARK_EVENT(p_processId NUMBER, p_actionName VARCHAR2, p_contextName VARCHAR2, p_timestamp TIMESTAMP DEFAULT NULL);
+    PROCEDURE TRACE_START(p_processId NUMBER, p_actionName VARCHAR2, p_contextName VARCHAR2, p_timestamp TIMESTAMP DEFAULT NULL);
+    PROCEDURE TRACE_STOP(p_processId NUMBER, p_actionName VARCHAR2, p_contextName VARCHAR2, p_timestamp TIMESTAMP DEFAULT NULL);
     FUNCTION GET_METRIC_AVG_DURATION(p_processId NUMBER, p_actionName VARCHAR2, p_contextName VARCHAR2) return NUMBER;
     FUNCTION GET_METRIC_STEPS(p_processId NUMBER, p_actionName VARCHAR2, p_contextName VARCHAR2) return NUMBER;
 

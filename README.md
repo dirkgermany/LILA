@@ -23,7 +23,7 @@ LILAM is developed by a developer who hates over-engineered tools. Focus: 5 minu
 - [Key features](#key-features)
 - [Fast integration](#fast-integration)
 - [Advantages](#advantages)
-- [Process Tracking & Monitoring](#process-tracking--monitoring]
+- [Process Tracking & Monitoring](#process-tracking--monitoring)
   - [How to](#how-to)
 - [Data](#data)
 - [Roadmap](#roadmap)

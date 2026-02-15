@@ -756,7 +756,7 @@ Note that an active server connection (`NEW_SESSION`) is required. Upon executio
 | p_password | VARCHAR2 | security for shutdown; | [`M`](#m)
 | p_serverName | VARCHAR2 | servers identity; no spaces allowed | [`M`](#m)
 | p_groupName | VARCHAR2 | group which server is dedicated to; no spaces allowed | [`N`](#n)
-| p_ruleSetName | VARCHAR2 | rules are organized within sets (see [architecture and concepts.md](docs/architecture%20and%20concepts.md)) | [`M`](#m)
+| p_ruleSetName | VARCHAR2 | rules are organized within sets (see [architecture and concepts.md](./architecture%20and%20concepts.md)) | [`M`](#m)
 | p_ruleSetVersion | PLS_INTEGER | version of ruleset | [`M`](#m)
 
 [↑ Back to Top](#lilam-api-reference)

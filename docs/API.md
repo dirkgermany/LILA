@@ -733,8 +733,11 @@ Retrieves the server name (which also serves as the pipe name). Similar to SERVE
  ```
 
 #### PROCEDURE SERVER_UPDATE_RULES
-The **LILAM Server** responds to signals based on predefined conditions. Supported events include process changes, marker events, and traced transactions. Rules are defined as JSON objects and persisted in the `LILAM_RULES` table. 
-The rule set can be updated dynamically using the `SERVER_UPDATE_RULES` procedure. After storing a new or modified rule set in `LILAM_RULES`, call this procedure to apply the changes. Note that an active server connection (`NEW_SESSION`) is required. Upon execution, the server implements the new rule set and logs the rule set name and version to the `LILAM_SERVER__REGISTRY`.
+The **LILAM Server** responds to signals based on predefined conditions. Supported events include process changes, marker events, and traced transactions. Rules are defined as JSON objects and persisted in the `LILAM_RULES` table.
+
+The rule set can be updated dynamically using the `SERVER_UPDATE_RULES` procedure. After storing a new or modified rule set in `LILAM_RULES`, call this procedure to apply the changes.
+
+Note that an active server connection (`NEW_SESSION`) is required. Upon execution, the server implements the new rule set and logs the rule set name and version to the `LILAM_SERVER__REGISTRY`.
 
  ```sql
   FUNCTION SERVER_UPDATE_RULES(

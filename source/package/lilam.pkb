@@ -10,7 +10,7 @@ create or replace PACKAGE BODY LILAM AS
         ---------------------------------------------------------------
         
         -- Dedicated to SERVER_LOOP
-        C_SEVER_MAX_SYNC_INTERVAL       CONSTANT PLS_INTEGER := 500;
+        C_SEVER_SYNC_INTERVAL       CONSTANT PLS_INTEGER := 500;
         C_SERVER_HEARTBEAT_INTERVAL     CONSTANT PLS_INTEGER := 60000;
         C_SERVER_MAX_LOOPS_IN_TIME      CONSTANT PLS_INTEGER := 10000;
         C_SERVER_TIMEOUT_WAIT_FOR_MSG   CONSTANT NUMBER      := 0.2; -- Timeout nach Sekunden Warten auf Nachricht
@@ -28,12 +28,13 @@ create or replace PACKAGE BODY LILAM AS
         ---------------------------------------------------------------
         -- Placeholders for tables
         ---------------------------------------------------------------
-        C_PARAM_MASTER_TABLE            CONSTANT varchar2(20) := 'PH_MASTER_TABLE';
-        C_PARAM_LOG_TABLE               CONSTANT varchar2(20) := 'PH_LOG_TABLE';
-        C_PARAM_MON_TABLE               CONSTANT varchar2(20) := 'PH_MON_TABLE';
+        C_PARAM_MASTER_TABLE            CONSTANT varchar2(50) := 'PH_MASTER_TABLE';
+        C_PARAM_LOG_TABLE               CONSTANT varchar2(50) := 'PH_LOG_TABLE';
+        C_PARAM_MON_TABLE               CONSTANT varchar2(50) := 'PH_MON_TABLE';
         C_SUFFIX_LOG_TABLE              CONSTANT varchar2(16) := '_LOG';
         C_SUFFIX_MON_TABLE              CONSTANT varchar2(16) := '_MON';
-        C_LILAM_SERVER_REGISTRY         CONSTANT VARCHAR2(30) := 'LILAM_SERVER_REGISTRY';
+        C_LILAM_SERVER_REGISTRY         CONSTANT VARCHAR2(50) := 'LILAM_SERVER_REGISTRY';
+        C_LILAM_RULES                   CONSTANT VARCHAR2(50) := 'LILAM_RULES';
       
         ---------------------------------------------------------------
         -- Other general Parameters
@@ -144,7 +145,36 @@ create or replace PACKAGE BODY LILAM AS
     
         TYPE t_dirty_queue IS TABLE OF BOOLEAN INDEX BY BINARY_INTEGER;
         g_dirty_queue t_dirty_queue;
-    
+        
+        ---------------------------------------------------------------
+        -- Rules
+        ---------------------------------------------------------------
+        -- Typ-Definition für die Regeldetails (aus dem JSON)
+        TYPE t_rule_rec IS RECORD (
+            rule_id             VARCHAR2(20),
+            trigger_type        VARCHAR2(20),  -- TRACE_STOP, MARK_EVENT
+            target_action       VARCHAR2(50),
+            target_context      VARCHAR2(50),
+            condition_operator  VARCHAR2(30),  -- GREATER_THAN_AVG_PERCENT, etc.
+            condition_value     NUMBER,
+            alert_handler       VARCHAR2(50),  -- LOG_AND_MAIL, etc.
+            alert_severity      VARCHAR2(20)
+        );
+        
+        -- Das assoziative Array (Die Map)
+        -- Wir indizieren mit VARCHAR2, um direkt mit den Namen zu suchen
+        TYPE t_rule_map IS TABLE OF t_rule_rec INDEX BY VARCHAR2(250);
+        
+        -- 1. Spezifische Regeln (Index: "ACTION|CONTEXT")
+        g_rules_by_context t_rule_map;
+        
+        -- 2. Allgemeine Regeln (Index: "ACTION")
+        g_rules_by_action  t_rule_map;
+        
+        -- Zusätzliche Variable für die aktuell geladene Version
+        g_current_rule_set_version NUMBER := 0;
+        g_current_rule_set_name    VARCHAR2(30);
+   
         ---------------------------------------------------------------
         -- Automatisierte Lastverteilung
         ---------------------------------------------------------------
@@ -282,6 +312,18 @@ create or replace PACKAGE BODY LILAM AS
     
         end;
         
+        --------------------------------------------------------------------------
+        -- Generate Action/Context - Key verifying Server Rules 
+        --------------------------------------------------------------------------
+        FUNCTION buildRuleKey(p_action VARCHAR2, p_context VARCHAR2 := NULL) RETURN VARCHAR2 IS
+        BEGIN
+            IF p_context IS NOT NULL THEN
+                RETURN p_action || '|' || p_context;
+            ELSE
+                RETURN p_action;
+            END IF;
+        END;
+
         --------------------------------------------------------------------------
         -- Avoid throttling 
         --------------------------------------------------------------------------
@@ -448,10 +490,12 @@ create or replace PACKAGE BODY LILAM AS
             l_retryInterval INTERVAL DAY TO SECOND := INTERVAL '30' SECOND;
         begin
             stabilizeInLowPerfEnvironments(p_processId);
-            l_header := '"header":{"msg_type":"API_CALL", "request":"' || p_request || '"}';
-            l_meta  := '"meta":{"param":"value"}';
-            l_data  := '"payload":' || p_payLoad;
+
             
+            l_header := '"header":{"msg_type":"API_CALL", "request":"' || p_request || '"}';
+            l_data  := '"payload":' || p_payLoad;
+            l_meta  := '"meta":{"param":"value"}';
+
             l_msg := '{' || l_header || ', ' || l_meta || ', ' || l_data || '}';
             l_pipeName := getServerPipeForSession(p_processId, null);
             DBMS_PIPE.PACK_MESSAGE(l_msg);
@@ -628,7 +672,21 @@ create or replace PACKAGE BODY LILAM AS
                     group_name     VARCHAR2(50),
                     last_activity  TIMESTAMP,
                     current_load   NUMBER,
-                    is_active      NUMBER(1)
+                    is_active      NUMBER(1),
+                    rule_set_name  VARCHAR2(30),
+                    set_in_use     NUMBER DEFAULT 0
+                )';
+                run_sql(sqlStmt);
+            end if;
+            
+            if not objectExists(C_LILAM_RULES, 'TABLE') then
+                sqlStmt := '
+                CREATE TABLE ' || C_LILAM_RULES || ' (
+                    rule_set       CLOB CONSTRAINT ensure_json_rules CHECK (rule_set IS JSON),
+                    set_name       VARCHAR2(30),
+                    version        NUMBER,
+                    created        TIMESTAMP,
+                    author         VARCHAR2(50)
                 )';
                 run_sql(sqlStmt);
             end if;
@@ -3071,6 +3129,18 @@ create or replace PACKAGE BODY LILAM AS
         
         -------------------------------------------------------------------------- 
         
+        PROCEDURE SERVER_UPDATE_RULES(p_processId NUMBER, p_ruleSetName VARCHAR2, p_ruleSetVersion PLS_INTEGER)
+        as
+            l_message  varchar2(200);
+            l_serverCode PLS_INTEGER;
+            l_slotIdx    PLS_INTEGER;
+        begin
+            l_message := '{"rule_set_name":"' || p_ruleSetName || '", "rule_set_version":"' || p_ruleSetVersion || '"}';
+            sendNoWait(p_processId, 'NEW_UPDATE_RULE', l_message, C_TIMEOUT_NEW_SESSION);               
+        end;
+        
+        -------------------------------------------------------------------------- 
+
         procedure SERVER_SHUTDOWN(p_processId number, p_pipeName varchar2, p_password varchar2)
         as
             l_response varchar2(1000);
@@ -3282,43 +3352,188 @@ create or replace PACKAGE BODY LILAM AS
         END;
         
         --------------------------------------------------------------------------
+        
+        function isServerPipeRegistered(p_pipeName varchar2) return BOOLEAN
+        as
+            l_exists INTEGER;
+            l_sqlStmt varchar2(200);
+        begin
+            l_sqlStmt := '
+            SELECT COUNT(*)
+            FROM ' || C_LILAM_SERVER_REGISTRY || '
+            WHERE pipe_name = ''' || p_pipeName || '''
+            AND rownum = 1'; -- Bricht nach dem ersten Treffer ab
+            execute immediate l_sqlStmt into l_exists;
+        
+            IF l_exists > 0 THEN
+                -- Server existiert
+                return true;
+            END IF;
+            return false;
+        end;
     
+        --------------------------------------------------------------------------
+
         procedure registerServerPipe
         as
             pragma autonomous_transaction; 
-            sqlStmt varchar2(1500);
+            l_sqlStmt varchar2(1500);
         begin
-            -- alten Eintrag erstmal raus
-            sqlStmt := '
-            delete from ' || C_LILAM_SERVER_REGISTRY || ' where pipe_name = :1';
-            execute immediate sqlStmt using g_serverPipeName;
-            
-            sqlStmt := '
-            insert into ' || C_LILAM_SERVER_REGISTRY || ' (
-                pipe_name,
-                group_name,
-                last_activity,
-                is_active,
-                current_load
-            ) values (
-                :1,
-                :2,
-                SYSTIMESTAMP,
-                1,
-                0
-            )';
-            execute immediate sqlStmt using g_serverPipeName, g_serverGroupName;
-    
+            if isServerPipeRegistered(g_serverPipeName) then
+                -- update existing entry
+                l_sqlStmt := '
+                update ' || C_LILAM_SERVER_REGISTRY || ' 
+                set last_activity = systimestamp,
+                    is_active = 1,
+                    current_load = 0
+                where pipe_name = :1';            
+                execute immediate l_sqlStmt using g_serverPipeName;
+            else
+                    -- new entry, server was not registered yet
+                l_sqlStmt := '
+                insert into ' || C_LILAM_SERVER_REGISTRY || ' (
+                    pipe_name,
+                    group_name,
+                    last_activity,
+                    is_active,
+                    current_load
+                ) values (
+                    :1,
+                    :2,
+                    SYSTIMESTAMP,
+                    1,
+                    0
+                )';
+                execute immediate l_sqlStmt using g_serverPipeName, g_serverGroupName;
+            end if;
             commit;
         
         exception
             when others then
-    raise;
+                raise;
                 rollback;
         end;
         
         --------------------------------------------------------------------------
+        
+        PROCEDURE load_rules_from_json(p_pipeName varchar2, p_ruleSet CLOB) IS
+            pragma autonomous_transaction; 
+            l_payload varchar2(1000);
+        BEGIN
+            -- Zuerst die alten Regeln löschen (Reset)
+            g_rules_by_context.DELETE;
+            g_rules_by_action.DELETE;
+        
+            FOR r IN (
+                SELECT *
+                FROM JSON_TABLE(p_ruleSet, '$.rules[*]'
+                    COLUMNS (
+                        rule_id    VARCHAR2(20) PATH '$.id',
+                        trigger_t  VARCHAR2(20) PATH '$.trigger_type',
+                        action     VARCHAR2(50) PATH '$.action',
+                        context  VARCHAR2(50) PATH '$.context',
+                        operator VARCHAR2(30) PATH '$.condition.operator',
+                        value    NUMBER       PATH '$.condition.value',
+                        handler  VARCHAR2(50) PATH '$.alert.handler',
+                        severity VARCHAR2(20) PATH '$.alert.severity'
+                    )
+                )
+            ) LOOP
+                -- Record vorbereiten
+                DECLARE
+                    l_new_rule t_rule_rec;
+                    l_key      VARCHAR2(250);
+                BEGIN
+                    l_new_rule.rule_id            := r.rule_id;
+                    l_new_rule.trigger_type       := r.trigger_t;
+                    l_new_rule.target_action      := r.action;
+                    l_new_rule.target_context     := r.context;
+                    l_new_rule.condition_operator := r.operator;
+                    l_new_rule.condition_value    := r.value;
+                    l_new_rule.alert_handler      := r.handler;
+                    l_new_rule.alert_severity     := r.severity;
+        
+                    -- Entscheidung: Kontext-Regel oder allgemeine Action-Regel?
+                    IF r.context IS NOT NULL THEN
+                        l_key := r.action || '|' || r.context;
+                        g_rules_by_context(l_key) := l_new_rule;
+                    ELSE
+                        l_key := r.action;
+                        g_rules_by_action(l_key) := l_new_rule;
+                    END IF;
+                END;
+            END LOOP;
+            
+            -- Version aus dem Header extrahieren (optionaler zweiter Schritt)
+            l_payload := JSON_QUERY(p_ruleSet, '$.header');
+            g_current_rule_set_name := extractFromJsonStr(l_payload, 'rule_set');
+            g_current_rule_set_version := extractFromJsonNum(l_payload, 'rule_set_version');
+            
+            execute immediate 'update ' || C_LILAM_SERVER_REGISTRY || ' set rule_set_name = :1, set_in_use = :2 where pipe_name = :3'
+            using g_current_rule_set_name, g_current_rule_set_version, p_pipeName;
+            commit;
+        
+        EXCEPTION
+            WHEN OTHERS THEN
+            raise;
+                lilam.error(g_serverProcessId, g_serverPipeName || '=>Failed to parse JSON rules: ' || SQLERRM);
+                rollback;
+        END;
+        
+        --------------------------------------------------------------------------
+
+        function existsNewServerRule(p_pipeName varchar2) return boolean
+        as
+            l_newestVersion PLS_INTEGER;
+            l_sqlStmt varchar2(200);
+        begin
+            l_sqlStmt := 'SELECT rule_version FROM ' || C_LILAM_SERVER_REGISTRY || ' WHERE pipe_name = :1';
+            execute immediate l_sqlStmt into l_newestVersion using p_pipeName;
+            if nvl(l_newestVersion, 0) > g_current_rule_set_version then 
+                return TRUE;
+            else
+                return FALSE;
+            end if;
+            
+        exception
+            when NO_DATA_FOUND then
+                return false;
+        end;
+
+        --------------------------------------------------------------------------
+        
+        procedure updateServerRules(l_message varchar2)
+        as
+            l_serverRuleSet CLOB;
+            l_payload  VARCHAR2(100);
+            l_ruleSetName varchar2(30);
+            l_ruleSetVersion PLS_INTEGER;
+            l_sqlStmt varchar2(200);
+        begin
+dbms_output.enable();
+dbms_output.put_line('--------------- MESSAGE: ' || l_message);
+
+            l_payload     := JSON_QUERY(l_message, '$.payload');
+            l_ruleSetName := extractFromJsonStr(l_payload, 'rule_set_name');
+            l_ruleSetVersion := extractFromJsonNum(l_payload, 'rule_set_version');
+            
+dbms_output.put_line('l_ruleSetName: ' || l_ruleSetName);
+dbms_output.put_line('l_ruleSetVersion ' || l_ruleSetVersion);
+
+            l_sqlStmt := 'SELECT rule_set FROM ' || C_LILAM_RULES || ' where set_name = :1 and version = :2';
+            execute immediate l_sqlStmt into l_serverRuleSet using l_ruleSetName, l_ruleSetVersion;
+            
+            load_rules_from_json(g_serverPipeName, l_serverRuleSet);
+            
+        exception
+            when NO_DATA_FOUND then
+                error(g_serverProcessId, 'Could not find server rule: ' || l_ruleSetName || '; version: ' || l_ruleSetVersion);
+            when others then
+                raise;
+        end;
     
+        --------------------------------------------------------------------------
+
         procedure updateServerRegistry(p_ready BOOLEAN)
         as
             pragma autonomous_transaction; 
@@ -3403,7 +3618,7 @@ create or replace PACKAGE BODY LILAM AS
             l_stop_server_exception EXCEPTION;            
             l_pipe     VARCHAR2(50) := p_pipeName;
             l_lastHeartbeat TIMESTAMP := sysTimestamp;
-            l_lastSync TIMESTAMP := sysTimestamp;        
+            l_lastSync TIMESTAMP := sysTimestamp;  
             l_loopCounter PLS_INTEGER := 0;
         begin
             g_shutdownPassword := p_password;
@@ -3427,6 +3642,9 @@ create or replace PACKAGE BODY LILAM AS
                                 l_shutdownSignal := TRUE;
                                 INFO(g_serverProcessId, g_serverPipeName || '=> Shutdown by remote request');
                             end if ;
+                            
+                        WHEN 'NEW_UPDATE_RULE' then
+                            updateServerRules(l_message);
                             
                         WHEN 'SERVER_PING' then
                         null;
@@ -3485,13 +3703,14 @@ create or replace PACKAGE BODY LILAM AS
                 end if;
                 
                 if l_message is null or l_loopCounter > C_SERVER_MAX_LOOPS_IN_TIME then
-                    if get_ms_diff(l_lastSync, sysTimestamp) >= C_SEVER_MAX_SYNC_INTERVAL  THEN
+                    if get_ms_diff(l_lastSync, sysTimestamp) >= C_SEVER_SYNC_INTERVAL  THEN
                         -- Housekeeping
-                         SYNC_ALL_DIRTY;
+                        SYNC_ALL_DIRTY;
                         updateServerRegistry(TRUE);
                         l_lastSync := sysTimestamp;
                         l_loopCounter := 0;
                     end if;
+                    
                     -- Timeout erreicht. Passiert, wenn 10 Sekunden kein Signal kam.
                     if get_ms_diff(l_lastHeartbeat, sysTimestamp) >= C_SERVER_HEARTBEAT_INTERVAL then
                         INFO(g_serverProcessId, g_serverPipeName || 'HEARTBEAT ' || g_serverPipeName);

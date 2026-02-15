@@ -177,21 +177,22 @@ SELECT * FROM lilam_log_detail WHERE process_id = <id> AND monitoring = 0
 ```
 The monitoring table consists of two parts: the 'left' one is dedicated to logging, the 'right' one is dedicated to monitoring.
 
->| PROCESS_ID | NO | INFO               | LOG_LEVEL | SESSION_TIME    | SESSION_USER | HOST_NAME | ERR_STACK        | ERR_BACKTRACE    | ERR_CALLSTACK    | MONITORING
->| ---------- | -- | --------------     | --------- | --------------- | ------------ | --------- | ---------------- | ---------------- | ---------------- | ------------
->| 1          | 1  | Start              | INFO      | 13.01.26 10:... | SCOTT        | SERVER1   | NULL             | NULL             | NULL             | 0
->| 1          | 2  | Function A         | DEBUG     | 13.01.26 11:... | SCOTT        | SERVER1   | NULL             | NULL             | "--- PL/SQL ..." | 0
->| 1          | 3  | Something happened | ERROR     | 13.01.26 12:... | SCOTT        | SERVER1   | "--- PL/SQL ..." | "--- PL/SQL ..." | "--- PL/SQL ..." | 0
+>| PROCESS_ID | NO | INFO               | LOG_LEVEL | SESSION_TIME    | SESSION_USER | HOST_NAME | ERR_STACK        | ERR_BACKTRACE    | ERR_CALLSTACK    |
+>| ---------- | -- | --------------     | --------- | --------------- | ------------ | --------- | ---------------- | ---------------- | ---------------- | 
+>| 1          | 1  | Start              | INFO      | 13.01.26 10:... | SCOTT        | SERVER1   | NULL             | NULL             | NULL             | 
+>| 1          | 2  | Function A         | DEBUG     | 13.01.26 11:... | SCOTT        | SERVER1   | NULL             | NULL             | "--- PL/SQL ..." | 
+>| 1          | 3  | Something happened | ERROR     | 13.01.26 12:... | SCOTT        | SERVER1   | "--- PL/SQL ..." | "--- PL/SQL ..." | "--- PL/SQL ..." | 
 
 **Monitoring data**
 ```sql
 SELECT * FROM lilam_log_detail WHERE process_id = <id> AND monitoring = 1 
 ```
 
->| PROCESS_ID | ... | ... | MONITORING | MON_ACTION | MON_STEPS_DONE | MON_USED_MILLIS | MON_AVG_MILLIS
->| ---------- | --- | --- | ---------- | ---------- | -------------- | --------------- | ---------------
->| 1          | ... | ... | 1          | MY_ACTION  | 1              | NULL            | NULL
->| 1          | ... | ... | 1          | MY_ACTION  | 2              | 1000            | 1000
+>| PROCESS_ID | MON_TYPE | ACTION       | CONTEXT          | START_TIME | STOP_TIME |STEPS_DONE     | USED_MILLIS     | AVG_MILLIS
+>| ---------- | ---------- | ---------- | ---------------- | -------------- | ---------------   ----------
+>| 1          | 0          | MY_ACTION  | MY_CONTEXT       | 1              | NULL            | NULL
+>| 1          | 0          | MY_ACTION  | MY_CONTEXT       | 2              | NULL            | 1500
+>| 1          | 1          | TRANS_ACT  | ROUTE_1          | 5              | 1000            | 1
 
 ---
 ## API

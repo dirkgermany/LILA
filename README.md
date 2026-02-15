@@ -109,14 +109,17 @@ LILAMs decoupled architecture is designed for seamless integration with modern m
 ### High-Efficiency Monitoring
 
 #### Real-Time and Granular Action Tracking
-LILAM is more than just a logging tool. Using the `MARK_STEP` functionality, named actions can be monitored independently. The framework automatically tracks metrics **per action**:
+LILAM is a specialized framework for deep process insights. Using `MARK_EVENT` and `TRACE` functionality, named actions are monitored independently. The framework automatically tracks metrics **per action and context**:
+
 * **Independent Statistics:** Monitor multiple activities (e.g., XML_PARSING, FILE_UPLOAD) simultaneously.
-* **Step Duration:** Precise execution time for a specific action's segment.
-* **Average Duration:** Historical benchmarks to detect performance degradation per action.
-* **Zero Client Overhead:** Calculations are processed within the session or offloaded to the server, depending on the chosen mode.
+* **Point-in-Time Events:** Track milestones and calculate intervals between recurring steps using `MARK_EVENT`.
+* **Transaction Tracing:** Use `TRACE_START` and `TRACE_STOP` for precise measurement of work blocks, ensuring clear visibility into long-running tasks.
+* **Moving Averages & Outliers:** LILAM maintains historical benchmarks to detect performance degradation or unusual execution times (outliers) in real-time.
+* **Zero Client Overhead:** Calculations are processed within the session buffer, minimizing database roundtrips and ensuring high performance.
 
 #### Intelligent Metric Calculation
-Instead of performing expensive aggregations across millions of log records for every query, LILAM uses an intelligent calculation mechanism. Metrics are updated incrementally, ensuring that monitoring dashboards (e.g., in Grafana, APEX, or Oracle Jet) remain highly responsive even with massive datasets.
+Instead of performing expensive aggregations across millions of monitor records, LILAM uses an incremental calculation mechanism. Metrics like averages and counters are updated on-the-fly. This ensures that monitoring dashboards (e.g., in Grafana, APEX, or Oracle Jet) remain highly responsive even with massive datasets.
+
 
 ### Core Strengths
 

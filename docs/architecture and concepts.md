@@ -152,6 +152,7 @@ These rules evaluate the global state of a process stored in the Master Table.
 | **Runtime**   | `MAX_RUNTIME_EXCEEDED` | `(PROCESS_END - PROCESS_START) > value`        | Process took too much time                    |
 | **Progress**  | `STEPS_LEFT_HIGH`     | `(STEPS_TODO - STEPS_DONE) > value`             | Check for unfinished work at process end.     |
 | **Efficiency**| `SUCCESS_RATE_LOW`    | `(STEPS_DONE / STEPS_TODO) * 100 < value`       | Monitor batch processing quality.             |
+| **Frequency** | `MAX_OCCURRENCE`      | `STEPS_DONE > value`                            | Flood protection / infinite loop detection.   |
 | **Status**    | `STATUS_EQUALS`       | `STATUS = value`                                | React to specific error status codes.         |
 | **Info Text** | `INFO_CONTAINS`       | `UPPER(INFO) LIKE '%' \|\| UPPER(value) \|\| '%'` | Search for keywords like "FATAL" or "ERROR".  |
 

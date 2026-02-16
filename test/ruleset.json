@@ -1,0 +1,49 @@
+{
+  "header": {
+    "rule_set": "TEST_SUITE_1",
+    "rule_set_version": 1,
+    "description": "Validation for Gaps, Deviations and Info-Logs"
+  },
+  "rules": [
+    {
+      "id": "T001",
+      "trigger_type": "TRACE_STOP",
+      "action": "HEAVY_CALCULATION",
+      "condition": {
+        "operator": "MAX_DURATION_MS",
+        "value": "2000"
+      },
+      "alert": { "handler": "LOG", "severity": "WARN", "throttle_seconds": 0 }
+    },
+    {
+      "id": "T002",
+      "trigger_type": "TRACE_START",
+      "action": "SUBWAY_STATION",
+      "condition": {
+        "operator": "MAX_GAP_SECONDS",
+        "value": "5"
+      },
+      "alert": { "handler": "LOG", "severity": "CRITICAL", "throttle_seconds": 10 }
+    },
+    {
+      "id": "T003",
+      "trigger_type": "PROCESS_UPDATE",
+      "action": "BATCH_IMPORT",
+      "condition": {
+        "operator": "INFO_CONTAINS",
+        "value": "FATAL"
+      },
+      "alert": { "handler": "LOG", "severity": "FATAL", "throttle_seconds": 0 }
+    },
+    {
+      "id": "T004",
+      "trigger_type": "MARK_EVENT",
+      "action": "HEARTBEAT",
+      "condition": {
+        "operator": "ON_EVENT",
+        "value": ""
+      },
+      "alert": { "handler": "LOG", "severity": "INFO", "throttle_seconds": 10 }
+    }
+  ]
+}

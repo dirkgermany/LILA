@@ -102,6 +102,57 @@ A process monitors actions **'A'** and **'B'**:
 *   Action **'B'** is a timed transaction (Trace). LILAM tracks the exact duration of each 'B' execution.
 *   **Results:** Totals, time histories, and averages for 'A' and 'B' are managed independently, providing a clear picture of process stability.
 
+## Rule Management & Event Response
+**Rules** define how LILAM servers react to incoming **signals**, transforming LILAM from a passive monitoring tool into an active **orchestrator**.
+
+Rules are organized into **Rule Sets**, structured as flexible JSON objects. The central table `LILA_RULES` serves as the repository for these configurations, storing each JSON-based rule set alongside a **version stamp**. This versioning allows every LILAM server to track, verify, and synchronize its active logic in real-time.
+
+### Trigger Types and Filter Mechanism
+LILAM uses a hierarchical filtering system to react to signals with high efficiency. Each rule is assigned to a specific **Trigger Type**, which defines the event that initiates the evaluation.
+
+**Available Trigger Types:**
+*   **`TRACE_START`**: Fired when a time measurement (transaction) begins. Useful for pre-checks or initializing external dependencies.
+*   **`TRACE_STOP`**: Fired when a transaction is completed. Ideal for performance monitoring and execution-time analysis.
+*   **`MARK_EVENT`**: Reacts to the arrival of a point-in-time milestone (Marker).
+*   **`PROCESS_UPDATE`**: Triggered by status changes or progress reports (e.g., step counters).
+
+### **Filtering Mechanism (Specific before General)**
+To minimize system overhead, the LILAM server evaluates rules in a two-stage process using high-performance associative arrays in memory:
+1.  **Context Filter (`Action|Context`):** The system first checks if a rule exists for the exact combination of action and context (e.g., `STATION_EXIT` at station `Moulin Rouge`). This allows for highly specific responses.
+2.  **Action Filter (`Action`):** If no context-specific rule is found, the system searches for a general rule assigned to the action (Fallback). This is ideal for defining global thresholds across all contexts.
+
+Multiple rules can be assigned to the same trigger. LILAM processes these rule lists sequentially, enabling complex chains of reaction.
+
+### **JSON Structure (Example)**
+The JSON object is divided into a header for metadata and an array of individual rules. Alert throttling is managed in seconds:
+
+```json
+{
+  "header": {
+    "rule_set": "SUBWAY_PROD",
+    "rule_set_version": 5,
+    "description": "Performance rules for Line 1"
+  },
+  "rules": [
+    {
+      "id": "R-001",
+      "trigger_type": "TRACE_STOP",
+      "action": "STATION_EXIT",
+      "context": "Moulin Rouge",
+      "condition": {
+        "operator": "GREATER_THAN_AVG_PERCENT",
+        "value": 50
+      },
+      "alert": {
+        "handler": "LOG_AND_MAIL",
+        "severity": "CRITICAL",
+        "throttle_seconds": 900
+      }
+    }
+  ]
+}
+
+```
 
 ## Operating Modes
 LILAM features two operating modes that applications can use. It is possible to address these modes in parallel from within an application—I call this 'hybrid usage.'

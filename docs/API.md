@@ -131,10 +131,15 @@ BEGIN
   -- 3. Start logging
   lilam.info(p_processId => l_processId, p_info => 'LILAM is up and running!');
   
-  -- 4. Mark a work step
-  lilam.mark_step(p_processId => l_processId, p_actionName => 'DATA_LOAD');
+  -- 4. Mark a work step and trace a business transaction
+  lilam.mark_event(p_processId => l_processId, p_actionName => 'DATA_LOAD'); -- simple event
+  lilam.trace_start(p_processId => l_processId, p_actionName => 'NEXT_STATION'); -- begins a transaction
   dbms_session.sleep(1);
-  lilam.mark_step(p_processId => l_processId, p_actionName => 'DATA_LOAD');
+  lilam.mark_event(p_processId => l_processId, p_actionName => 'DATA_LOAD');
+  lilam.trace_stop(p_processId => l_processId, p_actionName => 'TRACK_SECTION'); -- ends the transaction
+
+  -- 5. Update Process Status
+  lilam.step_done(p_processId => l_processId); -- increments process step counter
 
   -- 5. Shutdown the server
   lilam.server_shutdown(p_processId => l_processId, p_password => 'SECURE PASSWORD');

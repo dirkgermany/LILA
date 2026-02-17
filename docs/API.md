@@ -126,7 +126,8 @@ BEGIN
   -- Use SERVER_NEW_SESSION to connect to a central LILAM management server.
   -- In this mode, LILAM acts as a transparent relay: the local framework 
   -- handles all communication with the central server in the background, 
-  -- offloading the actual logging and monitorin  l_processId := lilam.server_new_session(p_sessionInit => l_sessionInit);
+  -- offloading the actual logging and monitoring
+  l_processId := lilam.server_new_session(p_sessionInit => l_sessionInit);
   
   -- 3. Start logging
   lilam.info(p_processId => l_processId, p_info => 'LILAM is up and running!');

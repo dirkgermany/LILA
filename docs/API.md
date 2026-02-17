@@ -88,6 +88,7 @@ BEGIN
   -- This ensures that logs are stored immediately and independently 
   -- from your main transaction (even if you ROLLBACK).
 END;
+/
 ```
 
 ### Decoupled (Server) Mode

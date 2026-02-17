@@ -153,7 +153,9 @@ To illustrate how LILAM works, imagine monitoring a subway system:
 
 ```sql
   l_processId NUMBER;
-
+```
+#### Open Session (begin Process) and set Session values
+```sql
   -- Start the mission (as a new Process/Session)
   -- Optional group-based isolation: LILAM servers can be assigned to specific groups to ensure strict workload isolation
   l_processId := lilam.server_new_session(p_processName => 'TRACK_LINE_4', p_groupName => 'UNDERGROUND_MONITORING', p_logLevel := lilam.logLevelMonitor);
@@ -161,20 +163,29 @@ To illustrate how LILAM works, imagine monitoring a subway system:
   -- set number of steps this mission needs to be finished correctly
   -- in our sample there are only two steps: leaving station and arriving station
   lilam.set_steps_todo(p_processId => l_processId, p_stepsToDo => 2);
-
+  
   -- leave station
   lilam.step_done(p_processId => l_processId); -- increments step-counter
+```
+
+#### Monitor Action (Metric) and Log
+```sql
   -- doors must be closed (Event)
   lilam.mark_event(p_processId => l_processId, p_actionName => 'CLOSE_DOOR', p_contextName => 'STATION_ID_400);
 
   -- log travel start
   lilam.info(p_processId => l_processId, 'Line 4 leaving base');
+```
 
+#### Track Business Transactions
+```sql
   -- travel the segment (trace Transaction by starting and stopping)
   lilam.trace_start(p_processId => l_processId, p_actionName => 'TRACK_SECTION', p_contextName => 'SECTION_ID_402');
   dbms_session.sleep(30); -- the train needed 30 seconds
   lilam.trace_stop(p_processId => l_processId, p_actionName => 'TRACK_SECTION', p_contextName => 'SECTION_ID_402');
-
+```
+#### Close Session (end Process)
+```sql
   -- the mission of line is very! short - only one section; so the mission ends here
   --   !  this didn't happen: lilam.step_done(p_processId => l_processId); -- increments step-counter
   lilam.info(p_processId => l_processId, 'Line 4 is back');
@@ -183,6 +194,7 @@ To illustrate how LILAM works, imagine monitoring a subway system:
   -- the step-counter is one, the rule-set would await 2 steps here
   -- LILAM would raise an `ALERT`
 ```
+
 #### Monitor Actions (Metrics)
 ```sql
   -- implicits count and average duration per marker

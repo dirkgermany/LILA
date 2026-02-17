@@ -239,7 +239,7 @@ FUNCTION SERVER_NEW_SESSION(
 
 <details>
   <summary><b>5. using [`t_session_init`](#record-type-t-session-init)</b> (Standard initialization)</summary>
-  This variant uses the dedicated [`t_session_init` record](#record-type-t-session-init) for initializing the new session.
+  This variant uses the dedicated [`t_session_init` record](#record-type-t_session_init) for initializing the new session.
   
  ```sql
   FUNCTION NEW_SESSION(

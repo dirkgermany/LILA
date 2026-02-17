@@ -46,53 +46,6 @@ After that you can see the package in your object tree (perhaps after refreshing
 That's it. If you got exceptions when executing the scripts please see [`Trouble Shooting`](#trouble-shooting).
 
 ---
-## Trouble shooting
-Hopefully not, but errors may occur when using LILAM for the first time.
-
-### Database Objects
-If, for any reason, one or all of the three required database objects are not automatically created when using the API, they can be created manually using the following statements if necessary.
-
->If you want to use names for the log tables that do not correspond to the default, this must be taken into account in the corresponding statements (see below)! 
-
-#### Create Sequence
-```sql
--- With executing the follogin statement the Sequence will be created
-CREATE SEQUENCE SEQ_LILAM_LOG MINVALUE 0 MAXVALUE 9999999999999999999999999999 INCREMENT BY 1 START WITH 1 CACHE 10 NOORDER  NOCYCLE  NOKEEP  NOSCALE  GLOBAL
-```
-
-#### Create Tables
-```sql
--- Create MASTER Table
--- Customise the name of the MASTER table here if it differs from the default
-create table LILAM_LOG (
-    id number(19,0),
-    process_name varchar2(100),
-    process_start timestamp(6),
-    process_end timestamp(6),
-    last_update timestamp(6),
-    steps_todo NUMBER,
-    steps_done number,
-    status number(1,0),
-    info clob
-);
-
--- Create DETAIL Table
--- Customise the name of the DETAIL table here if it differs from the default
-create table LILAM_LOG_DETAIL (
-    process_id number(19,0),
-    no number(19,0),
-    info clob,
-    log_level varchar2(10),
-    session_time timestamp  DEFAULT SYSTIMESTAMP,
-    session_user varchar2(50),
-    host_name varchar2(50),
-    err_stack clob,
-    err_backtrace clob,
-    err_callstack clob
-);
-```
-
-
 ## Testing
 After all creation steps are done successfully, you can test LILAM by calling the life check :)
 ```sql

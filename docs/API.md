@@ -94,7 +94,7 @@ END;
 
 **Step 1: Start the server (Session A)**
 
-To use the decoupled mode, you first need to start a LILAM server. For this example, use a dedicated session (e.g., a second instance of SQL Developer), as the server will block the session while it is running. In production environments, the server is typically started as a background process via DBMS_JOB to avoid session blocking.
+To use the decoupled mode, you first need to start a LILAM server. For this example, use a dedicated database session (e.g., a second instance of SQL Developer), as the server will block the session while it is running. In production environments, the server is typically started as a background process via `DBMS_JOB` or `DBMS_SCHEDULE` to avoid session blocking.
 
 By default, the client automatically identifies and connects to the server with the lowest current load. This means the client does not need to know specific server names in advance.
 Additionally, it is possible to explicitly connect a client to a server assigned to a specific group. In this case, the system also automatically selects the server with the lowest current workload within that group.
@@ -122,9 +122,10 @@ BEGIN
   l_sessionInit.logLevel    := logLevelInfo;     -- default is logLevelMonitorr
   
   -- 2. Initialize the session
-  -- Use SERVER_NEW_SESSION instead of NEW_SESSION to connect to a LILAM server.
-  -- LILAM now acts as a dedicated client, handling communication in the background.
-  l_processId := lilam.server_new_session(p_sessionInit => l_sessionInit);
+  -- Use SERVER_NEW_SESSION to connect to a central LILAM management server.
+  -- In this mode, LILAM acts as a transparent relay: the local framework 
+  -- handles all communication with the central server in the background, 
+  -- offloading the actual logging and monitorin  l_processId := lilam.server_new_session(p_sessionInit => l_sessionInit);
   
   -- 3. Start logging
   lilam.info(p_processId => l_processId, p_info => 'LILAM is up and running!');

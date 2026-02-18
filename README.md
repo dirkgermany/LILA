@@ -162,7 +162,7 @@ To illustrate how LILAM works, imagine monitoring a subway system:
 ```sql
   -- Start the mission (as a new Process/Session)
   -- Optional group-based isolation: LILAM servers can be assigned to specific groups to ensure strict workload isolation
-  l_processId := lilam.server_new_session(p_processName => 'TRACK_LINE_4', p_groupName => 'UNDERGROUND_MONITORING', p_logLevel := lilam.logLevelMonitor);
+  l_processId := lilam.server_new_session(p_processName => 'TRACK_LINE_4', p_groupName => 'UNDERGROUND_MONITORING', p_logLevel => lilam.logLevelMonitor);
 
   -- set number of steps this mission needs to be finished correctly
   -- in our sample there are only two steps: leaving station and arriving station

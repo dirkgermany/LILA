@@ -27,7 +27,7 @@ LILAM is developed by a developer who hates over-engineered tools. Focus: 5 minu
 - [Process Tracking & Monitoring](#process-tracking--monitoring)
   - [How To - The Subway Sample](#how-to---the-subway-sample)
 - [Data](#data)
-- [Performance Benchark](#performance-benchmark)
+- [Performance Benchmark](#performance-benchmark)
 - [Roadmap](#roadmap)
 - [License](#license)
 

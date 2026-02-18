@@ -3996,7 +3996,7 @@ dbms_output.put_line('writeEventToMonitorBuffer -> p_processId: ' || p_processId
             
         --------------------------------------------------------------------------
         
-        function processRequest(p_request varchar2, p_message varchar2, p_clientChannel varchar2) return boolean
+        function processRequest(p_request varchar2, p_message varchar2, p_clientChannel varchar2, p_drain BOOLEAN DEFAULT FALSE, p_forceDrain BOOLEAN DEFAULT FALSE) return boolean
         as
         begin
             CASE p_request
@@ -4015,8 +4015,10 @@ dbms_output.put_line('writeEventToMonitorBuffer -> p_processId: ' || p_processId
                 null;
                 
                 WHEN 'NEW_SESSION' THEN
-                    INFO(g_serverProcessId, g_serverPipeName || '=> New remote session ordered');
-                    doRemote_newSession(p_clientChannel, p_message);
+                    if not p_drain then
+                        INFO(g_serverProcessId, g_serverPipeName || '=> New remote session ordered');
+                        doRemote_newSession(p_clientChannel, p_message);
+                    end if;
                     
                 WHEN 'CLOSE_SESSION' THEN
                     INFO(g_serverProcessId, g_serverPipeName || '=> Remote session closed');
@@ -4047,7 +4049,9 @@ dbms_output.put_line('writeEventToMonitorBuffer -> p_processId: ' || p_processId
                     doRemote_getMonitorLastEntry(p_clientChannel, p_message);
                     
                 WHEN 'UNFREEZE_REQUEST' then
-                    doRemote_unfreezeClient(p_clientChannel, p_message);
+                    if not p_forceDrain then
+                        doRemote_unfreezeClient(p_clientChannel, p_message);
+                    end if;
                     
                 ELSE 
                     -- Unbekanntes Tag loggen
@@ -4200,8 +4204,8 @@ dbms_output.put_line('writeEventToMonitorBuffer -> p_processId: ' || p_processId
                 l_request := extractClientRequest(l_message);
                 
                 -- Im Drain verarbeiten wir nur noch Log-Daten, keine neuen Sessions/Shutdowns
-                if l_request IN ('LOG_ANY', 'MARK_EVENT', 'UNFREEZE_REQUEST') THEN
-                    l_shutdownSignal := processRequest(l_request, l_message, l_clientChannel);
+--                if l_request IN ('LOG_ANY', 'MARK_EVENT', 'UNFREEZE_REQUEST') THEN
+                    l_shutdownSignal := processRequest(l_request, l_message, l_clientChannel, TRUE);
 /*
                     CASE l_request
                         WHEN 'LOG_ANY' then
@@ -4215,7 +4219,7 @@ dbms_output.put_line('writeEventToMonitorBuffer -> p_processId: ' || p_processId
     
                     END CASE;
 */
-                end if ;
+--                end if ;
             END LOOP;
             
             DBMS_OUTPUT.ENABLE();

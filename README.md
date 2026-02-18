@@ -85,7 +85,6 @@ LILAM offers two execution models that can be used interchangeably:
 
 ### Performance & Safety
 LILAM prioritizes the stability of your application. It uses a Hybrid Model to balance speed and system integrity:
-* Standard: Fire-and-Forget
 * Logs, metrics, and status updates are handled via Fire-and-Forget to minimize overhead. Zero latency for your business logic.
 * Active Throttling
 * As an optional safeguard, LILAM rate-limits hyperactive clients during load peaks to prevent pipe flooding until the bottleneck is cleared.

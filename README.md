@@ -205,9 +205,9 @@ To illustrate how LILAM works, imagine monitoring a subway system:
 ### Rule-based Observability & Orchestration
 LILAM doesn't just log data; it evaluates it. Using versioned JSON Rule-Sets, LILAM monitors process changes and business transactions in real-time.
 
-    Versioned Logic: Different worker instances can run different versions of the same rule-set simultaneously—perfect for side-by-side testing or phased rollouts.
-    Instant Alerts: Violations trigger immediate alerts, which are processed by independent consumers.
-    System Decoupling: By separating alert generation from processing, LILAM stays lean and serves as a high-performance orchestrator for downstream application logic.
+* **Versioned Logic:** Different worker instances can run different versions of the same rule-set simultaneously—perfect for side-by-side testing or phased rollouts.
+* **Instant Alerts:** Violations trigger immediate alerts, which are processed by independent consumers.
+* **System Decoupling:** By separating alert generation from processing, LILAM stays lean and serves as a high-performance orchestrator for downstream application logic.
 
 ---
 ## Data

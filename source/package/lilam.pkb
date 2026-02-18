@@ -3377,7 +3377,7 @@ dbms_output.put_line('writeEventToMonitorBuffer -> p_processId: ' || p_processId
 
         -------------------------------------------------------------------------- 
         
-        procedure doRemote_unfreezeClient(p_clientChannel varchar2, p_message VARCHAR2)
+        procedure doRemote_unfreezeClient(p_clientChannel varchar2, p_message VARCHAR2, p_shutdown BOOLEAN DEFAULT FALSE)
         as
             l_payload varchar2(1600);
             l_status PLS_INTEGER;
@@ -3388,7 +3388,11 @@ dbms_output.put_line('writeEventToMonitorBuffer -> p_processId: ' || p_processId
         begin
             l_header := '"header":{"msg_type":"SERVER_RESPONSE", "msg_name":"UNFREEZE_CLIENT"}';
             l_meta   := '"meta":{"server_version":"' || LILAM_VERSION || '"}';
-            l_data   := '"payload":{"server_message":"' || TXT_ACK_OK || '","server_code":' || get_serverCode(TXT_ACK_OK);
+            if p_shutdown then
+                l_data   := '"payload":{"server_message":"' || TXT_ACK_SHUTDOWN || '","server_code":' || get_serverCode(TXT_ACK_SHUTDOWN);
+            else
+                l_data   := '"payload":{"server_message":"' || TXT_ACK_OK || '","server_code":' || get_serverCode(TXT_ACK_OK);
+            end if;
             l_msg := '{' || l_header || ', ' || l_meta || ', ' || l_data || '}';
     
             -- no payload, client waits only for unfreezing
@@ -4050,7 +4054,7 @@ dbms_output.put_line('writeEventToMonitorBuffer -> p_processId: ' || p_processId
                     
                 WHEN 'UNFREEZE_REQUEST' then
                     if not p_forceDrain then
-                        doRemote_unfreezeClient(p_clientChannel, p_message);
+                        doRemote_unfreezeClient(p_clientChannel, p_message, p_drain);
                     end if;
                     
                 ELSE 

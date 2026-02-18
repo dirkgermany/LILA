@@ -170,7 +170,7 @@ To illustrate how LILAM works, imagine monitoring a subway system:
   lilam.set_steps_todo(p_processId => l_processId, p_stepsToDo => 2);
   
   -- leave station
-  lilam.step_done(p_processId => l_processId); -- increments step-counter
+  lilam.step_done(p_processId => l_processId); -- increments step-counter into `1`
 ```
 
 #### Monitor Action (Metric) and Log
@@ -192,11 +192,11 @@ To illustrate how LILAM works, imagine monitoring a subway system:
 #### Close Session (end Process)
 ```sql
   -- the mission of line is very! short - only one section; so the mission ends here
-  --   !  this didn't happen: lilam.step_done(p_processId => l_processId); -- increments step-counter
+  --   !  missed code: lilam.step_done(p_processId => l_processId); -- increments step-counter into `2`
   lilam.info(p_processId => l_processId, p_logText => 'Line 4 is back');
   lilam.close_session(p_processId => l_processId);
 
-  -- the step-counter is one, the rule-set awaits 2 steps here
+  -- the step-counter still is `1`. If there was an implemented rule-set which awaits 2 steps
   -- LILAM would raise an `ALERT`
 ```
 

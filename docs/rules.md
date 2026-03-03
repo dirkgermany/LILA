@@ -1,1 +1,0 @@
-Regeln und ihre Validierung

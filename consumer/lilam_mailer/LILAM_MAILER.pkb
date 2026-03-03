@@ -127,9 +127,7 @@ create or replace PACKAGE BODY LILAM_MAILER AS
         
     -------------------------------------------------------------------------
 
-    PROCEDURE runMailer IS
-        -- Variablen für DBMS_ALERT
-        
+    PROCEDURE runMailer IS        
         -- Dynamische Daten
         v_info_text     VARCHAR2(2000);
         v_used_millis   NUMBER;
@@ -164,8 +162,23 @@ create or replace PACKAGE BODY LILAM_MAILER AS
                         FOR UPDATE SKIP LOCKED
                     ) LOOP
                         BEGIN -- Sicherungskapsel für den einzelnen Alert
-                            -- 1. Mapping (dein Code)
-                            -- 2. Daten laden (readJsonRule, readProcessData)
+                            -- 1. Mapping
+                            l_alert_rec.alert_id            := rec.alert_id;
+                            l_alert_rec.process_id          := rec.process_id; 
+                            l_alert_rec.master_table_name   := rec.master_table_name;
+                            l_alert_rec.monitor_table_name  := rec.monitor_table_name;
+                            l_alert_rec.action_name         := rec.action_name;
+                            l_alert_rec.context_name        := rec.context_name;
+                            l_alert_rec.action_count        := rec.action_count;
+                            l_alert_rec.rule_set_name       := rec.rule_set_name;
+                            l_alert_rec.rule_id             := rec.rule_id;
+                            l_alert_rec.rule_set_version    := rec.rule_set_version;
+                            l_alert_rec.alert_severity      := rec.alert_severity;
+
+                            -- 2. Daten laden
+                            l_json_rec := readJsonRule(l_alert_rec);
+                            l_process_rec := readProcessData(l_alert_rec.process_id, l_alert_rec.action_name, l_alert_rec.action_count, l_alert_rec.master_table_name, l_alert_rec.monitor_table_name);
+
                             -- 3. Body bauen & Senden
                             v_mail_body := prepareMailBodyHtml(l_lilam_rec, l_alert_rec, l_json_rec);
                             send_mail_via_relay('LILAM-ALERT: ' || l_alert_rec.rule_id, v_mail_body, 'dirk@dirk-goldbach.de');

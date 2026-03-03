@@ -144,58 +144,45 @@ create or replace PACKAGE BODY LILAM_MAILER AS
         v_count     pls_integer;
 
     BEGIN
-        DBMS_ALERT.REMOVE('v_alert_name');
-        DBMS_ALERT.REGISTER(LILAM.C_ALERT_MAIL_LOG);
+        DBMS_ALERT.REMOVE(LILAM_CONSUMER.C_ALERT_MAIL_LOG);
+        DBMS_ALERT.REGISTER(LILAM_CONSUMER.C_ALERT_MAIL_LOG);
         DBMS_OUTPUT.PUT_LINE('LILAM Mail-Log Consumer gestartet...');
     
         LOOP
-            -- 1. Warten auf Signal (Timeout nach 60s für Idle-Check)
-            DBMS_ALERT.WAITONE(LILAM.C_ALERT_MAIL_LOG, v_msg_payload, v_status, 5);
+            COMMIT; -- Snapshot erneuern für den nächsten Durchgang
+            DBMS_ALERT.WAITONE(LILAM_CONSUMER.C_ALERT_MAIL_LOG, v_msg_payload, v_status, 60);
     
             IF v_status = 0 THEN
-                -- Wir loopen kurz, bis die Daten wirklich sichtbar sind 
-                -- oder ein Timeout greift (Retry-Logik statt blindem Sleep)
-                FOR i IN 1..5 LOOP
-                    -- WICHTIG: Ein neues SELECT braucht oft einen frischen Snapshot
-                    SELECT count(*) INTO v_count 
-                    FROM LILAM_ALERTS 
-                    WHERE handler_type = 'MAIL_LOG' and status = 'PENDING';
-                    
-                    EXIT WHEN v_count > 0;
-                    DBMS_SESSION.SLEEP(0.05); -- Kurzes Warten (50ms) falls Snapshot noch hinkt
-                END LOOP;
-                
+                -- Kurzer Check auf PENDING Records
+                SELECT count(*) INTO v_count FROM LILAM_ALERTS 
+                WHERE handler_type = 'MAIL_LOG' AND status = 'PENDING';
+    
                 IF v_count > 0 THEN
                     FOR rec IN (
-                        SELECT alert_id, process_id, master_table_name, monitor_table_name, action_name, context_name,
-                            action_count, rule_set_name, rule_id, rule_set_version, alert_severity
-                        FROM LILAM_ALERTS
-                        WHERE handler_type = 'MAIL_LOG' and status in ('PENDING') FOR UPDATE SKIP LOCKED
+                        SELECT * FROM LILAM_ALERTS
+                        WHERE handler_type = 'MAIL_LOG' AND status = 'PENDING'
+                        FOR UPDATE SKIP LOCKED
                     ) LOOP
-                        l_alert_rec.alert_id            := rec.alert_id;
-                        l_alert_rec.process_id          := rec.process_id; 
-                        l_alert_rec.master_table_name   := rec.master_table_name;
-                        l_alert_rec.monitor_table_name  := rec.monitor_table_name;
-                        l_alert_rec.action_name         := rec.action_name;
-                        l_alert_rec.context_name        := rec.context_name;
-                        l_alert_rec.action_count        := rec.action_count;
-                        l_alert_rec.rule_set_name       := rec.rule_set_name;
-                        l_alert_rec.rule_id             := rec.rule_id;
-                        l_alert_rec.rule_set_version    := rec.rule_set_version;
-                        l_alert_rec.alert_severity      := rec.alert_severity;
-
-                        l_json_rec := LILAM_CONSUMER.readJsonRule(l_alert_rec);
-                        l_lilam_rec := LILAM_CONSUMER.readProcessData(l_alert_rec.process_id, l_alert_rec.action_name, l_alert_rec.action_count, l_alert_rec.master_table_name, l_alert_rec.monitor_table_name);
-                        v_mail_body := prepareMailBodyHtml(l_lilam_rec, l_alert_rec, l_json_rec);
-                       
-                        send_mail_via_relay('LILAM-ALERT: ' || l_alert_rec.rule_id, v_mail_body, 'dirk@dirk-goldbach.de');
-                        
-                        LILAM_CONSUMER.updateAlert(rec.alert_id);
-                        dbms_session.sleep(10); -- Vermeidung von Spam-Sperre
+                        BEGIN -- Sicherungskapsel für den einzelnen Alert
+                            -- 1. Mapping (dein Code)
+                            -- 2. Daten laden (readJsonRule, readProcessData)
+                            -- 3. Body bauen & Senden
+                            v_mail_body := prepareMailBodyHtml(l_lilam_rec, l_alert_rec, l_json_rec);
+                            send_mail_via_relay('LILAM-ALERT: ' || l_alert_rec.rule_id, v_mail_body, 'dirk@dirk-goldbach.de');
+                            
+                            -- 4. Status auf PROCESSED setzen
+                            LILAM_CONSUMER.updateAlert(rec.alert_id);
+                            
+                            COMMIT; -- Einzel-Commit pro Mail ist hier sicher
+                            DBMS_SESSION.SLEEP(1); -- Etwas weniger aggressiv als 10s?
+                            
+                        EXCEPTION WHEN OTHERS THEN
+                            ROLLBACK; -- Sperre lösen
+                            -- Hier evtl. Status auf 'FAILED' setzen, damit er nicht ewig loopt
+--                            LILAM.LOG_ERROR('Mailer failed for Alert ' || rec.alert_id || ': ' || SQLERRM);
+                        END;
                     END LOOP;
-                    COMMIT; -- Macht die Verarbeitung für andere sichtbar
                 END IF;
-                
             END IF;
         END LOOP;
     END;

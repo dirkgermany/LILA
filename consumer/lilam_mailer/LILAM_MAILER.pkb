@@ -176,8 +176,8 @@ create or replace PACKAGE BODY LILAM_MAILER AS
                             l_alert_rec.alert_severity      := rec.alert_severity;
 
                             -- 2. Daten laden
-                            l_json_rec := readJsonRule(l_alert_rec);
-                            l_process_rec := readProcessData(l_alert_rec.process_id, l_alert_rec.action_name, l_alert_rec.action_count, l_alert_rec.master_table_name, l_alert_rec.monitor_table_name);
+                            l_json_rec := LILAM_CONSUMER.readJsonRule(l_alert_rec);
+                            l_lilam_rec := LILAM_CONSUMER.readProcessData(l_alert_rec.process_id, l_alert_rec.action_name, l_alert_rec.action_count, l_alert_rec.master_table_name, l_alert_rec.monitor_table_name);
 
                             -- 3. Body bauen & Senden
                             v_mail_body := prepareMailBodyHtml(l_lilam_rec, l_alert_rec, l_json_rec);

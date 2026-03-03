@@ -1,3 +1,4 @@
+```json
 {
   "header": {
     "rule_set": "TEST_SUITE_METRO",
@@ -31,7 +32,7 @@
 	  "_comment": "Mehr als 25 Sekunden dauert die Fahrt nicht. Irgendetwas hat den Zug aufgehalten.",
       "trigger_type": "TRACE_STOP",
       "action": "TRACK_SECTION",
-      "context": "SECTION_400_001"
+      "context": "SECTION_400_001",
       "condition": {
         "operator": "MAX_DURATION_MS",
         "value": "25000"
@@ -97,3 +98,4 @@
 }
    ]
 }
+```

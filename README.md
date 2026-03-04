@@ -59,7 +59,7 @@ LILAM is developed by a developer who hates over-engineered tools. Focus: 5 minu
 * Analysing or monitoring your process requires simple sql statements or API requests
 
 >LILAM comes ready to test right out of the box, so no custom implementation or coding is required to see the framework in action immediately after setup.
->Also please have a look to the sample applications 'learn_lilam': https://github.com/dirkgermany/LILAM-Logging/tree/main/demo/first_steps.
+>First code impressions you can find here: [learn_lilam](demo/first_steps/learn_lilam.pkb).
 
 ---
 

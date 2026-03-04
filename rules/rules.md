@@ -50,46 +50,44 @@ sequenceDiagram
 Rules define how LILAM validates incoming events. Each rule shares a common set of parameters that specify which event type to monitor, the evaluation criteria to apply, and the corresponding action to take when a rule is triggered (e.g., notifying on a threshold breach or confirming an expected sequence of events).
 Rules are organized into Rule Sets, which are stored as JSON objects in the LILAM_RULES table. Within these JSON objects, individual rules are managed as structured arrays for efficient processing.
 
-action + context
 ### Rule Set Structure
 | Property | Type | Description
 | :-- | :-- | :--
 | header | object | metadata for the rule set
-| header.rule_set | string | name of rule set
-| header.rule_set_version | number | versioning eg. for testing
-| header.description | human-readable purpose of the rule set
-| rules | array | collection of rules
-| rules.id | string | key of rule
+| header.rule_set | string | unique name of rule set
+| header.rule_set_version | number | version identifier (e.g., for testing or staging)
+| header.description | string | human-readable purpose or hints for the rule set
+| rules | array | a collection of individual rule definitions
+| rules.id | string | unique identifier for the rule (e.g., SEQ-001)
 | rules.trigger_type | enum | specific hook or lifecycle stage that activates the rule evaluation¹
-| rules.action | string | name of trigger
-| rules.context | string | optional additional filter to narrow down a rule to a specific instance of an action²
-| rules.condition | object | metadata for conditions
-| rules.condition.operator | string | name of filter to validate
-| rules.condition.value | string | specifies the filter (can be a number, a range or the combination of values)
-| rules.alert | object | metadata of the alert
-| rules.alert.handler | string | any kind of a following process which processes the alert
-| rules.alert.severity | enum | serverity level as an information for the handler
-| rules.alert.throttle | number | the number of seconds within the same alert has to be ignored
+| rules.action | string | the name of the event or action to monitor
+| rules.context | string | optional filter to narrow down a rule to a specific instance²
+| rules.condition | object | container for validation logic
+| rules.condition.operator | string | the logic/filter to be applied
+| rules.condition.value | string | parameter for the operator (number, range, or combined values)
+| rules.alert | object | metadata for alert handling
+| rules.alert.handler | string | the downstream process designated to handle the alert
+| rules.alert.severity | enum | severity level passed to the alert handler
+| rules.alert.throttle | number | minimum seconds to wait before re-triggering the same alert
 
 
-¹The trigger_type acts as a filter to determine when a rule should be evaluated. It maps to the core API calls of the LILAM instrumentation, such as starting a transaction (TRACE_START), hitting a specific milestone (MARK_EVENT), or completing a process (PROCESS_STOP).
+¹ The trigger_type acts as a filter to determine when a rule is evaluated. It maps to core LILAM API calls, such as starting a transaction (TRACE_START), reaching a milestone (MARK_EVENT), or completing a process (PROCESS_STOP).
 
 ### Hooks
 | hook | event type | effect
 | :-- | :-- | :--
-| ON_EVENT, ON_START, ON_STOP | Event, Transaction, Process | synonyms for reacting on incoming signals
-| ON_UPDATE, PROCESS_START, PROCESS_STOP | Process | dedicated to changes of Processes
+| ON_EVENT, ON_START, ON_STOP | Event, Transaction, Process | generic triggers for reacting to incoming signals
+| ON_UPDATE, PROCESS_START, PROCESS_STOP | Process | specific triggers for process lifecycle changes
 
 ### Operators
-| operator | value / range | event type | description
+| operator | value / unit | scope | description
 | :-- | :-- | :-- | :--
-| AVG_DEVIATION_PCT | percent | Event, Transaction, Process | average duration as EWMA (...)
-| MAX_DURATION_MS | milliseconds | Event, Transaction | maximum milliseconds of duration; calculated for events from signal to signal
-| MAX_OCCURRENCE | count | Event, Transaction | max. allowed number of succeeded signals by action + context (context if used)
-| MAX_GAP_SECONDS | seconds | Event, Transaction | max. lapse of time between last and actual incoming Event or Transaction identified by action and context
-| PRECEDED_BY | name and context | Event, Transaction, Process | matches action + context (if used) of the predecessor with the rules condition
-| PRECEDED_BY_WITHIN_MS | name and context and milliseconds | Event, Transaction, Process | extends the PRECEDED_BY rule with a time factor
-
+| AVG_DEVIATION_PCT | percent | all | Detects duration anomalies using EWMA
+| MAX_DURATION_MS | milliseconds | Event, Transaction | Maximum allowed duration between signals
+| MAX_OCCURRENCE | count | Event, Transaction | Max allowed number of consecutive signals per action/context
+| MAX_GAP_SECONDS | seconds | Event, Transaction | Max time elapsed between the previous and current signal
+| PRECEDED_BY | name and context | all | Validates if the direct predecessor matches the condition
+| PRECEDED_BY_WITHIN_MS | name and context and milliseconds | all | Extends PRECEDED_BY with a maximum time constraint
 
 
 ²The context field allows you to apply rules more selectively. Use it to differentiate between various instances of the same action. This is particularly useful when different thresholds or SLAs apply to specific locations or segments (e.g., a "Speed Limit" rule that only applies to a specific track section).

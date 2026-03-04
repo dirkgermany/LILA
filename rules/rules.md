@@ -44,8 +44,6 @@ sequenceDiagram
 
 > **Note:** LILAM rules are not limited to error detection. They can also be used to track positive business milestones or validate complex event sequences (e.g., "Event B must follow Event A within X seconds").
 
-
-
 ## Configuration
 Rules define how LILAM validates incoming events. Each rule shares a common set of parameters that specify which event type to monitor, the evaluation criteria to apply, and the corresponding action to take when a rule is triggered (e.g., notifying on a threshold breach or confirming an expected sequence of events).
 Rules are organized into Rule Sets, which are stored as JSON objects in the LILAM_RULES table. Within these JSON objects, individual rules are managed as structured arrays for efficient processing.
@@ -70,9 +68,6 @@ Rules are organized into Rule Sets, which are stored as JSON objects in the LILA
 | rules.alert.severity | enum | severity level passed to the alert handler
 | rules.alert.throttle | number | minimum seconds to wait before re-triggering the same alert
 
-
-¹ The trigger_type acts as a filter to determine when a rule is evaluated. It maps to core LILAM API calls, such as starting a transaction (TRACE_START), reaching a milestone (MARK_EVENT), or completing a process (PROCESS_STOP).
-
 ### Hooks
 | hook | event type | effect
 | :-- | :-- | :--
@@ -82,16 +77,33 @@ Rules are organized into Rule Sets, which are stored as JSON objects in the LILA
 ### Operators
 | operator | value / unit | scope | description
 | :-- | :-- | :-- | :--
-| AVG_DEVIATION_PCT | percent | all | Detects duration anomalies using EWMA
-| MAX_DURATION_MS | milliseconds | Event, Transaction | Maximum allowed duration between signals
-| MAX_OCCURRENCE | count | Event, Transaction | Max allowed number of consecutive signals per action/context
-| MAX_GAP_SECONDS | seconds | Event, Transaction | Max time elapsed between the previous and current signal
-| PRECEDED_BY | name and context | all | Validates if the direct predecessor matches the condition
-| PRECEDED_BY_WITHIN_MS | name and context and milliseconds | all | Extends PRECEDED_BY with a maximum time constraint
+| AVG_DEVIATION_PCT | percent | all | detects duration anomalies using **EWMA**
+| MAX_DURATION_MS | milliseconds | Event, Transaction | maximum allowed duration between signals
+| MAX_OCCURRENCE | count | Event, Transaction | max allowed number of consecutive signals per action/context
+| MAX_GAP_SECONDS | seconds | Event, Transaction | max time elapsed between the previous and current signal
+| PRECEDED_BY | name and context | all | validates if the direct predecessor matches the condition
+| PRECEDED_BY_WITHIN_MS | name and context and milliseconds | all | extends PRECEDED_BY with a maximum time constraint
 
-
-²The context field allows you to apply rules more selectively. Use it to differentiate between various instances of the same action. This is particularly useful when different thresholds or SLAs apply to specific locations or segments (e.g., a "Speed Limit" rule that only applies to a specific track section).
+¹ The trigger_type acts as a filter to determine when a rule is evaluated. It maps to core LILAM API calls, such as starting a transaction (TRACE_START), reaching a milestone (MARK_EVENT), or completing a process (PROCESS_STOP).
+² The context field allows you to apply rules more selectively. Use it to differentiate between various instances of the same action. This is particularly useful when different thresholds or SLAs apply to specific locations or segments (e.g., a "Speed Limit" rule that only applies to a specific track section).
 For example rule SEQ-003 only monitors travel times for the specific track segment SECTION_400_001, rather than every segment on the line.
+
+### Deep Dive: Anomaly Detection with EWMA
+
+The `AVG_DEVIATION_PCT` operator utilizes an **Exponentially Weighted Moving Average (EWMA)**. Unlike a simple arithmetic mean, the EWMA gives more weight to recent data points, allowing the system to adapt to shifting performance trends in real-time.
+
+#### What is EWMA?
+It is a statistical measure used to model time-series data. In LILAM, it creates a "moving baseline" for your business transactions. If a new event deviates significantly from this baseline, an alert is triggered.
+
+#### Technical Example: `20|100|0.1`
+When using `AVG_DEVIATION_PCT` with the value `20|100|0.1`, the parameters are defined as follows:
+
+
+| Parameter | Value | Description |
+| :--- | :--- | :--- |
+| **Tolerance** | `20` | Trigger an alert if the deviation is > 20% from the average. |
+| **Warm-up** | `100` | Minimum number of initial events needed to build a stable baseline before alerting starts. |
+| **Smoothing (Alpha)** | `0.1` | The weight of the latest event (10%). A lower value makes the average more stable; a higher value makes it more reactive to sudden changes. |
 
 ```json
     {
@@ -108,12 +120,27 @@ For example rule SEQ-003 only monitors travel times for the specific track segme
     }
 
 ```
+---
+## Table: LILAM_RULES
+This table serves as the central repository for all rule sets. Each rule set is stored as a single, versioned JSON document, allowing for flexible and dynamic rule management.
+
+| Column | Type | Description |
+| :--- | :--- | :--- |
+| **SET_NAME** | `VARCHAR2(30)` | Primary Key. The unique identifier for the rule set. |
+| **VERSION** | `NUMBER` | Version number to support testing, staging, and rollbacks. |
+| **RULE_SET** | `CLOB` | The core configuration: A JSON object containing the header and the array of rule definitions. |
+| **CREATED** | `TIMESTAMP` | Audit timestamp: When this specific version was created. |
+| **AUTHOR** | `VARCHAR2(50)` | Attribution: The developer or architect who defined the rule set. |
 
 
-### Table LILAM_RULES
+> ** Implementation Note **
+> The LILAM servers load the `RULE_SET` JSON into RAM at startup (or upon manual refresh). This minimizes database I/O during high-speed event processing, as all rule evaluations are performed against the cached > memory structure.
 
+---
+## Loading a Rule Set
 
 LILAM servers support dynamic rule set updates at runtime. Active configurations are persisted in the `LILAM_SERVER_REGISTRY`, ensuring that servers automatically reload the correct rule sets upon restart:
 ```sql
-exec LILAM.SERVER_UPDATE_RULES(p_processId => 1202, p_ruleSetName => 'METRO Rules', p_ruleSetVersion 2);
+exec LILAM.SERVER_UPDATE_RULES(p_processId => 1202, p_ruleSetName => 'METRO Rules', p_ruleSetVersion => 2);
 ```
+

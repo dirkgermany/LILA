@@ -1,3 +1,7 @@
+
+! Note: This is the very first sample application for LILAM. Since its creation, many core aspects of the framework have evolved.
+An updated version of this code will be released shortly to reflect these improvements.
+
 create or replace PACKAGE BODY LEARN_LILAM AS
 
     /*
@@ -17,7 +21,7 @@ create or replace PACKAGE BODY LEARN_LILAM AS
             p_processName   => 'simple sample',
             p_logLevel      => lilam.logLevelInfo,
             p_daysToKeep    => 1,
-            p_tabNameMaster => 'learn_lila_log'
+            p_tabNameMaster => 'learn_lilam'
         );
         lilam.info(lProcessId, 'simple sample little step');
         lilam.set_process_status(lProcessId, 1, 'Perfect!');

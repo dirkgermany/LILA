@@ -483,14 +483,8 @@ AS
         begin
             -- Wenn noch kein Trend da ist (Initialstart), können wir nichts validieren.
             if p_monitor_rec.avg_action_time is null or p_monitor_rec.avg_action_time = 0 then
-dbms_output.put_line('validateDurationInAverage avg_action_time is null or 0');
                 return TRUE; 
             end if;
-dbms_output.new_line();
-dbms_output.put_line('validateDurationInAverage used_time: ' || p_monitor_rec.used_time);
-dbms_output.put_line('                    avg_action_time: ' || p_monitor_rec.avg_action_time);
-dbms_output.put_line('                    p_metricFactor:  ' || p_metricFactor);
-dbms_output.new_line();
 
             -- Vergleich gegen den bestehenden Trend
             -- Da p_old_ewma während des Warm-ups dem Trend folgt, 

@@ -1,6 +1,6 @@
 create or replace PACKAGE LILAM AS
     /* Complete Doc and last version see https://github.com/dirkgermany/LILA/docs */
-LILAM_VERSION constant varchar2(20) := 'v1.3.0';
+    LILAM_VERSION constant varchar2(20) := 'v1.3.0';
 
     -- =====================================
     -- JSON as VARCHAR2 for max. performance
@@ -39,11 +39,18 @@ LILAM_VERSION constant varchar2(20) := 'v1.3.0';
     TXT_DATA_ANSWER     CONSTANT VARCHAR2(30) := 'SERVER_DATA_ANSWER';
     NUM_DATA_ANSWER     CONSTANT VARCHAR2(30) := 102;
     
+    -- SUFFIXES of the three main tables
+    C_SUFFIX_PROC_TABLE CONSTANT varchar2(6) := '_PROC'; -- Process
+    C_SUFFIX_LOG_TABLE  CONSTANT varchar2(6) := '_LOG';  -- Logging
+    C_SUFFIX_MON_TABLE  CONSTANT varchar2(6) := '_MON';  -- Monitoring
+    C_LILAM_RULES       CONSTANT VARCHAR2(16) := 'LILAM_RULES';
+    C_LILAM_ALERTS      CONSTANT VARCHAR2(16) := 'LILAM_ALERTS';
+    
     -- ================================
     -- Record representing process data
     -- ================================
     TYPE t_process_rec IS RECORD (
-        id              NUMBER(19,0),
+        id             NUMBER(19,0),
         processName    varchar2(100),
         logLevel       PLS_INTEGER,
         processStart   TIMESTAMP,
@@ -57,6 +64,9 @@ LILAM_VERSION constant varchar2(20) := 'v1.3.0';
         tabNameMaster VARCHAR2(100)
     );
 
+    -- ================================
+    -- Record representing session data
+    -- ================================
     TYPE t_session_init IS RECORD (
         processName     VARCHAR2(100),
         logLevel        PLS_INTEGER := logLevelMonitor,
@@ -65,6 +75,30 @@ LILAM_VERSION constant varchar2(20) := 'v1.3.0';
         procImmortal    PLS_INTEGER := 0,
         tabNameMaster VARCHAR2(100) DEFAULT 'LILAM_LOG'
     );
+    
+    -- ==============================
+    -- Sructure of table LILAM_ALERTS
+    -- ==============================
+    TYPE t_alert_rec IS RECORD (
+        alert_id            NUMBER,
+        process_id          NUMBER,
+        master_table_name   VARCHAR2(50),
+        monitor_table_name  VARCHAR2(50),
+        action_name         VARCHAR2(50),
+        context_name        VARCHAR2(50),
+        action_count        PLS_INTEGER,
+        rule_set_name       VARCHAR2(50),
+        rule_id             VARCHAR2(50),
+        rule_set_version    PLS_INTEGER,
+        alert_severity      VARCHAR2(50)
+    );
+    
+    -- ==============================
+    -- Alerts for activating consumer
+    -- ==============================
+    C_ALERT_MAIL_LOG CONSTANT VARCHAR2(30) := 'LILAM_ALERT_MAIL_LOG';
+
+    
 
 
     ------------------------------
@@ -76,8 +110,6 @@ LILAM_VERSION constant varchar2(20) := 'v1.3.0';
     FUNCTION NEW_SESSION(p_processName VARCHAR2, p_logLevel PLS_INTEGER, p_procStepsToDo NUMBER, p_daysToKeep NUMBER, p_tabNameMaster VARCHAR2 DEFAULT 'LILAM_LOG') RETURN NUMBER;
 
     FUNCTION SERVER_NEW_SESSION(p_processName varchar2, p_groupName VARCHAR2, p_logLevel PLS_INTEGER, p_procStepsToDo PLS_INTEGER, p_daysToKeep PLS_INTEGER, p_tabNameMaster varchar2) RETURN VARCHAR2;
-
-
     FUNCTION SERVER_NEW_SESSION(p_jasonString varchar2) RETURN NUMBER;
     FUNCTION SERVER_NEW_SESSION(p_processName varchar2, p_logLevel PLS_INTEGER, 
             p_procStepsToDo PLS_INTEGER, p_daysToKeep PLS_INTEGER, p_tabNameMaster varchar2) RETURN VARCHAR2;
@@ -128,7 +160,7 @@ LILAM_VERSION constant varchar2(20) := 'v1.3.0';
     -----------------
     -- Server control
     -----------------
-    FUNCTION CREATE_SERVER(p_password varchar2) RETURN VARCHAR2;
+    FUNCTION CREATE_SERVER(p_groupName varchar2, p_password varchar2) RETURN VARCHAR2;
     PROCEDURE START_SERVER(p_pipeName varchar2, p_groupName varchar2, p_password varchar2);
     PROCEDURE SERVER_SHUTDOWN(p_processId number, p_pipeName varchar2, p_password varchar2);
     FUNCTION GET_SERVER_PIPE(p_processId NUMBER) RETURN VARCHAR2;
@@ -145,4 +177,5 @@ LILAM_VERSION constant varchar2(20) := 'v1.3.0';
     ----------
     -- Check if LILAM works
     PROCEDURE IS_ALIVE;
+        
 END LILAM;

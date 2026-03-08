@@ -311,7 +311,7 @@ This project is dual-licensed:
     * Automatically scale LILAM-Server instances based on real-time pipe throughput
     * Ensure Graceful Shutdown of redundant instances to free up CPU and SGA without data loss
 - [ ] **List active Sessions:** Retrieves a list of all active sessions, pipes and so on
-- [ ] **JSon Signatures:** Transport header information into server also as logged values
+- [x] **JSon Signatures:** Transport header information into server also as logged values
 
 
 ---
